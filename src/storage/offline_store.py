@@ -8,12 +8,15 @@ DO UPDATE) with batched execution (PRD § 11, M2.9).
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
 from loguru import logger
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.engine import Engine
+
+from src.storage.models import UserFeatures
 
 BATCH_SIZE: int = 5_000
 
@@ -143,3 +146,36 @@ def write_features_to_db(
         "Offline store write complete: {:,} rows in {:.3f}s", rows_written, duration
     )
     return {"rows_written": rows_written, "duration_sec": duration}
+
+
+def read_user_features(engine: Engine, user_id: int) -> dict[str, Any] | None:
+    """Read one user's full feature row from the offline store.
+
+    Args:
+        engine: Connected SQLAlchemy Engine pointing to the feature store DB.
+        user_id: User identifier to look up (primary key of user_features).
+
+    Returns:
+        A column-name → value dict for the matching row (including the
+        ``computed_at`` and ``feature_version`` metadata columns), or None
+        if no row exists for that user_id.
+    """
+    stmt = select(UserFeatures).where(UserFeatures.user_id == user_id)
+    with engine.connect() as conn:
+        row = conn.execute(stmt).mappings().first()
+    return dict(row) if row is not None else None
+
+
+def get_last_computed_at(engine: Engine) -> datetime | None:
+    """Return the most recent ``computed_at`` timestamp across all feature rows.
+
+    Args:
+        engine: Connected SQLAlchemy Engine pointing to the feature store DB.
+
+    Returns:
+        The newest ``computed_at`` datetime, or None if the table is empty.
+    """
+    stmt = select(func.max(UserFeatures.computed_at))
+    with engine.connect() as conn:
+        result: datetime | None = conn.execute(stmt).scalar_one_or_none()
+    return result
