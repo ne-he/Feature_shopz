@@ -4,12 +4,9 @@
 > Ingests transaction data, computes 20+ user-level features in batch,
 > serves them via a low-latency REST API, and monitors freshness & drift.
 
-**Status:** 🚧 Milestone 1 complete — Foundation & Data Layer ✓
-
-> **Full specification:** [`PRD.md`](PRD.md) · **Engineering conventions:** [`CLAUDE.md`](CLAUDE.md)
+**Status:** ✅ All milestones complete (M1–M4) — ingestion → features → serving API → monitoring.
 
 ---
-hash
 
 ## Architecture
 
@@ -60,7 +57,7 @@ flowchart TB
 | Data processing | Pandas + Polars |
 | Offline store | PostgreSQL 15 (SQLAlchemy 2.0 + Alembic) |
 | Online store | Redis 7 |
-| Orchestration | Prefect 2.x |
+| Orchestration | APScheduler (daily refresh) |
 | Monitoring | Streamlit + Evidently |
 | Testing | pytest + pytest-cov |
 | Linting | Ruff + Black + Mypy |
@@ -109,6 +106,37 @@ make lint           # runs: ruff check . && mypy src/
 Both services define healthchecks, use named Docker volumes
 (`postgres_data`, `redis_data`), and read credentials from `.env`.
 
+## Running the Stack
+
+> On Windows, invoke the project venv directly: `.\.venv\Scripts\python.exe -m <cmd>`.
+
+```bash
+# Serving API (M3) — Swagger UI at http://localhost:8000/docs
+uvicorn src.api.main:app --reload
+
+# Monitoring dashboard (M4) — opens at http://localhost:8501
+streamlit run src/dashboard/app.py
+
+# One-off feature refresh (compute → offline store → sync to Redis)
+python -c "from src.orchestration.jobs import run_refresh_job; run_refresh_job()"
+
+# API latency benchmark (against the running server)
+python scripts/benchmark_api.py --base-url http://localhost:8000
+```
+
+The daily refresh is scheduled with APScheduler (`src/orchestration/flows.py`,
+`build_scheduler()`); see the [runbook](docs/runbook.md) for operating it.
+
+### API Endpoints (M3)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/health` | Liveness + Postgres/Redis probes |
+| `GET` | `/features/online/{user_id}` | Redis-first lookup, Postgres fallback |
+| `POST` | `/features/batch` | Up to 100 users in one call |
+| `GET` | `/features/offline/{user_id}` | Postgres-only (training lookups) |
+| `GET` | `/features/metadata` | Feature catalog from the registry |
+
 ## Dataset Setup
 
 This project uses the **E-Commerce Synthetic Dataset** (100k rows × 21 columns,
@@ -138,9 +166,9 @@ src/
   features/            RFM, behavior, engagement, temporal, discount, demographics (M2)
   storage/             SQLAlchemy models, offline (PG) + online (Redis) stores (M2-M3)
   api/                 FastAPI app + routes (M3)
-  orchestration/       Prefect flows (M4)
-  monitoring/          Drift detection + freshness (M4)
-  dashboard/           Streamlit app (M4)
+  orchestration/       APScheduler daily refresh job (M4)
+  monitoring/          Freshness, Evidently drift, store metrics (M4)
+  dashboard/           Streamlit app — 4 pages (M4)
 
 tests/
   conftest.py          Shared fixtures
@@ -159,14 +187,16 @@ docs/                 Architecture, API spec, feature catalog, runbook
 
 ## Milestones
 
-| # | Milestone | Status | ETA |
-|---|-----------|--------|-----|
-| **M1** | **Foundation & Data Layer** | ✅ **Done** | Week 1 |
-| M2 | Feature Computation Engine (20+ features) | 🔜 Next | Week 2-3 |
-| M3 | Serving Layer (FastAPI + Redis) | ⏳ | Week 3-4 |
-| M4 | Monitoring & Dashboard | ⏳ | Week 4-5 |
+| # | Milestone | Status |
+|---|-----------|--------|
+| **M1** | Foundation & Data Layer | ✅ Done |
+| **M2** | Feature Computation Engine (23 features) | ✅ Done |
+| **M3** | Serving Layer (FastAPI + Redis) | ✅ Done |
+| **M4** | Monitoring, Drift & Dashboard | ✅ Done |
 
-Target API latency: p99 < 100 ms (single user lookup).
+Target API latency: p99 < 100 ms single / < 500 ms batch-100.
+In-process benchmark (no network hop): single p99 ≈ 22 ms, batch-100 p99 ≈ 79 ms.
+Run `python scripts/benchmark_api.py --base-url http://localhost:8000` for real-stack numbers.
 
 ## Testing
 
@@ -178,13 +208,14 @@ ruff check . && mypy src/      # lint + type-check
 
 Module coverage targets (per `PRD.md § 16`):
 
-| Module | Target |
-|--------|--------|
-| `src/ingestion/` | ≥ 85% |
-| `src/features/` | ≥ 90% |
-| `src/storage/` | ≥ 80% |
-| `src/api/` | ≥ 80% |
-| Overall | ≥ 80% |
+| Module | Target | Current |
+|--------|--------|---------|
+| `src/ingestion/` | ≥ 85% | ✅ |
+| `src/features/` | ≥ 90% | ✅ |
+| `src/storage/` | ≥ 80% | ✅ |
+| `src/api/` | ≥ 80% | ✅ |
+| `src/monitoring/` | ≥ 80% | ✅ |
+| Overall | ≥ 80% | **95%** (174 tests) |
 
 ## Database Migrations
 
