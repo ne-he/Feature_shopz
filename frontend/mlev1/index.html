@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Feature Store MVP — One definition. Two stores. Zero skew.</title>
+<meta name="description" content="A from-scratch feature store for e-commerce ML. 23 user-level features computed once, served fast and consistently to model training (PostgreSQL) and live inference (Redis) via a FastAPI REST API." />
+
+<!-- Fonts: editorial serif display + grotesque body + engineering mono -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          paper:   '#F4F1EA',   /* warm paper background */
+          paper2:  '#EFEBE2',   /* slightly deeper panel */
+          card:    '#FBFAF6',   /* raised surface */
+          ink:     '#1C1B17',   /* warm near-black text */
+          ink2:    '#3A372F',
+          muted:   '#6E6A5E',   /* secondary text */
+          faint:   '#928D7E',   /* tertiary / captions */
+          line:    '#E0DBCF',   /* hairline */
+          line2:   '#CDC6B5',   /* stronger hairline */
+          accent:  '#C0441D',   /* vermilion */
+          accent2: '#D9542A',
+          slate:   '#3C5A8C',   /* type: str */
+          olive:   '#5E7A45',   /* type: bool */
+          panel:   '#1B1A15',   /* dark code panel */
+        },
+        fontFamily: {
+          serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+          sans:  ['"Hanken Grotesk"', 'system-ui', 'sans-serif'],
+          mono:  ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+        },
+        maxWidth: { content: '1160px' },
+      },
+    },
+  };
+</script>
+
+<style>
+  :root { color-scheme: light; }
+  html, body { background: #F4F1EA; }
+  body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+  ::selection { background: rgba(192,68,29,0.16); color: #1C1B17; }
+
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: #F4F1EA; }
+  ::-webkit-scrollbar-thumb { background: #CDC6B5; border-radius: 8px; border: 3px solid #F4F1EA; }
+  ::-webkit-scrollbar-thumb:hover { background: #b8b09c; }
+
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid #C0441D; outline-offset: 3px; border-radius: 2px;
+  }
+
+  /* Serif display tuning */
+  .serif { font-family: '"Instrument Serif"', Georgia, serif; font-weight: 400; letter-spacing: -0.005em; }
+  h1.serif, h2.serif { line-height: 0.98; }
+  .serif em { font-style: italic; }
+
+  .label { font-family: '"IBM Plex Mono"', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+
+  /* Hairline helpers */
+  .rule { height: 1px; background: #E0DBCF; }
+  .rule-strong { height: 1px; background: #CDC6B5; }
+
+  /* Scroll reveal */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .8s cubic-bezier(.2,.6,.3,1), transform .8s cubic-bezier(.2,.6,.3,1); }
+  .reveal.is-in { opacity: 1; transform: none; }
+  .reveal[data-delay="1"] { transition-delay: .07s; }
+  .reveal[data-delay="2"] { transition-delay: .14s; }
+  .reveal[data-delay="3"] { transition-delay: .21s; }
+  .reveal[data-delay="4"] { transition-delay: .28s; }
+  .reveal[data-delay="5"] { transition-delay: .35s; }
+
+  /* Flowing pulse along architecture connectors */
+  .pulse-x, .pulse-y { position: relative; background: #CDC6B5; overflow: hidden; }
+  .pulse-x::after {
+    content: ""; position: absolute; top: 0; left: 0; height: 100%; width: 26px;
+    background: linear-gradient(90deg, transparent, #C0441D, transparent);
+    animation: runx 2.8s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  @keyframes runx { 0% { left: -26px; } 100% { left: 100%; } }
+  .pulse-y::after {
+    content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 26px;
+    background: linear-gradient(180deg, transparent, #C0441D, transparent);
+    animation: runy 2.8s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  @keyframes runy { 0% { top: -26px; } 100% { top: 100%; } }
+
+  /* Spec table row hover */
+  .frow { transition: background-color .2s ease; }
+  .frow:hover { background-color: rgba(192,68,29,0.04); }
+
+  /* Buttons */
+  .btn-ink { background: #1C1B17; color: #F4F1EA; transition: transform .25s ease, background-color .25s ease; }
+  .btn-ink:hover { background: #000; transform: translateY(-1px); }
+  .btn-ghost { color: #1C1B17; border-bottom: 1px solid #CDC6B5; transition: border-color .25s ease, color .25s ease; }
+  .btn-ghost:hover { border-color: #C0441D; color: #C0441D; }
+
+  .link-accent { color: #C0441D; text-decoration: none; border-bottom: 1px solid rgba(192,68,29,0.35); transition: border-color .2s ease; }
+  .link-accent:hover { border-color: #C0441D; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+
+<body class="bg-paper text-ink font-sans">
+
+<a href="#hero" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-card focus:text-ink focus:px-4 focus:py-2 focus:rounded focus:border focus:border-line2 label">Skip to content</a>
+
+<!-- ============ HEADER ============ -->
+<header id="hdr" class="fixed top-0 inset-x-0 z-50 border-b border-transparent transition-all duration-300">
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <nav class="flex items-center justify-between h-16" aria-label="Primary">
+      <a href="#hero" class="flex items-baseline gap-2.5 group">
+        <span class="serif text-[22px] leading-none text-ink">Feature Store</span>
+        <span class="label text-faint translate-y-[-1px]">MVP</span>
+      </a>
+      <div class="hidden md:flex items-center gap-7 label text-muted">
+        <a href="#features" class="hover:text-accent transition-colors">Features</a>
+        <a href="#architecture" class="hover:text-accent transition-colors">Architecture</a>
+        <a href="#api" class="hover:text-accent transition-colors">API</a>
+        <span id="api-status" class="flex items-center gap-2" title="Live API status" aria-live="polite">
+          <span id="api-status-dot" class="h-1.5 w-1.5 rounded-full bg-faint"></span>
+          <span id="api-status-text" class="text-faint">checking…</span>
+        </span>
+        <a href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener" class="flex items-center gap-1.5 text-ink hover:text-accent transition-colors">Source <span aria-hidden="true">↗</span></a>
+      </div>
+      <a href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener" class="md:hidden label text-ink">Source ↗</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section id="hero" class="relative pt-28 md:pt-36 pb-16 md:pb-20 overflow-hidden">
+  <!-- (hero background video intentionally omitted — the footage now lives, framed and monochrome, inside Fig. 00 on the right) -->
+
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-14 items-center">
+      <!-- Left: type -->
+      <div>
+        <div class="reveal flex items-center gap-3 label text-muted">
+          <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+          Production ML Infrastructure
+          <span class="text-line2">/</span>
+          <span class="text-faint">v1 · 2026</span>
+        </div>
+
+        <h1 class="reveal serif mt-7 text-[3.4rem] sm:text-7xl lg:text-[5.4rem] text-ink" data-delay="1">
+          One definition.<br />Two stores.<br /><em class="text-accent">Zero skew.</em>
+        </h1>
+
+        <p class="reveal mt-7 max-w-xl text-[17px] md:text-lg leading-relaxed text-muted" data-delay="2">
+          Feature Store MVP computes <span class="text-ink font-medium">23 user-level features</span> once, then serves them fast and consistently to model training and live inference — ending the train/serve skew that quietly degrades production models.
+        </p>
+
+        <div class="reveal mt-9 flex flex-wrap items-center gap-x-7 gap-y-4" data-delay="3">
+          <a href="#architecture" class="btn-ink inline-flex items-center gap-2 rounded-full px-6 py-3 label tracking-[0.12em]">
+            Explore the architecture
+          </a>
+          <a href="#api" class="btn-ghost inline-flex items-center pb-0.5 label tracking-[0.12em]">
+            Read the API
+          </a>
+        </div>
+
+        <!-- spec strip -->
+        <dl class="reveal mt-12 grid grid-cols-2 sm:grid-cols-4 border-t border-line2" data-delay="4">
+          <div class="py-5 pr-5 border-r border-line">
+            <dd class="serif text-4xl text-ink" data-count="23">0</dd>
+            <dt class="label text-faint mt-1">Features</dt>
+          </div>
+          <div class="py-5 px-5 border-r border-line">
+            <dd class="serif text-4xl text-ink">2</dd>
+            <dt class="label text-faint mt-1">Stores</dt>
+          </div>
+          <div class="py-5 px-5 border-r border-line">
+            <dd class="serif text-4xl text-ink"><span class="text-2xl text-muted align-top">&lt;</span><span data-count="100">0</span><span class="text-2xl text-muted">ms</span></dd>
+            <dt class="label text-faint mt-1">p99 latency<span class="text-accent">*</span></dt>
+          </div>
+          <div class="py-5 pl-5">
+            <dd class="serif text-4xl text-ink"><span data-count="100">0</span><span class="text-2xl text-muted">K</span></dd>
+            <dt class="label text-faint mt-1">Users</dt>
+          </div>
+        </dl>
+        <p class="reveal label text-faint mt-3 normal-case tracking-normal" data-delay="4" style="font-size:11px;">* Design target — not a measured benchmark.</p>
+      </div>
+
+      <!-- Right: live-lookup figure -->
+      <div class="reveal" data-delay="2">
+        <figure class="relative">
+          <div class="rounded-xl border border-line2 bg-card shadow-[0_30px_60px_-32px_rgba(28,27,23,0.35)] overflow-hidden">
+            <!-- monochrome feature-stream footage (grayscale + warm so it fits the paper palette, no cyan) -->
+            <div class="relative bg-panel">
+              <video id="hero-stream" class="w-full aspect-[16/10] object-cover" autoplay muted loop playsinline preload="auto" poster="./assets/hero-bg.jpg" aria-hidden="true" style="filter: grayscale(1) sepia(0.28) brightness(0.92) contrast(1.08);">
+                <source src="./assets/hero-bg.mp4" type="video/mp4" />
+              </video>
+              <div class="absolute inset-0 pointer-events-none" style="background: linear-gradient(180deg, rgba(27,26,21,0.05) 0%, transparent 30%, rgba(27,26,21,0.35) 100%);"></div>
+              <div class="absolute top-3 left-3 flex items-center gap-2 rounded-full px-2.5 py-1" style="background: rgba(27,26,21,0.55); backdrop-filter: blur(4px);">
+                <span class="h-1.5 w-1.5 rounded-full bg-accent2"></span>
+                <span class="font-mono text-[10px] tracking-[0.16em]" style="color:#E6E1D5;">FEATURE STREAM</span>
+              </div>
+            </div>
+            <!-- request header — editable, live -->
+            <form id="lookup-form" class="flex items-center justify-between gap-3 px-5 py-3 border-t border-b border-line bg-paper2/60">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="label text-accent shrink-0">GET</span>
+                <code class="font-mono text-[12.5px] text-ink2 shrink-0">/features/online/</code>
+                <input id="uid-input" type="text" inputmode="numeric" value="12345" aria-label="User ID"
+                  class="w-20 bg-transparent font-mono text-[12.5px] text-ink border-b border-line2 focus:border-accent outline-none px-0.5" />
+                <button id="run-btn" type="submit"
+                  class="btn-ink rounded-full px-3 py-1 label tracking-[0.1em] text-[10px] shrink-0">Run</button>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span id="status-dot" class="h-1.5 w-1.5 rounded-full bg-faint"></span>
+                <span id="status-text" class="font-mono text-[11px] text-muted">— · <span id="lat">—</span>ms</span>
+              </div>
+            </form>
+            <!-- feature rows -->
+            <div class="px-5 py-2" id="lookup-rows">
+              <!-- filled by JS -->
+            </div>
+            <!-- footer -->
+            <div class="flex items-center justify-between px-5 py-3 border-t border-line bg-paper2/40 font-mono text-[11px] text-faint">
+              <span>source: <span id="lk-source" class="text-slate">—</span></span>
+              <span>feature_version: <span id="lk-version">—</span></span>
+              <span id="lk-computed" class="hidden sm:inline">—</span>
+            </div>
+          </div>
+          <figcaption class="label text-faint mt-3 ml-1">Fig. 00 — A served feature vector</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main>
+<!-- ============ FEATURE CATALOG ============ -->
+<section id="features" class="relative py-20 md:py-28 border-t border-line2">
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <div class="reveal flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div class="max-w-2xl">
+        <p class="label text-accent">§ 01 — Feature Catalog</p>
+        <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">23 features.<br class="hidden sm:block" /> One definition each.</h2>
+        <p class="mt-5 max-w-lg text-muted leading-relaxed">Every feature is computed once in the pipeline and served identically to training and inference. Filter the datasheet by category.</p>
+      </div>
+      <div class="font-mono text-sm text-muted shrink-0 md:text-right">
+        <span id="feat-count" class="serif text-4xl text-ink leading-none">23</span><br />
+        <span class="label text-faint">of 23 shown</span>
+      </div>
+    </div>
+
+    <!-- filter -->
+    <div id="feat-tabs" class="reveal mt-10 flex flex-wrap gap-2" role="tablist" aria-label="Feature categories">
+      <button class="feat-tab is-active" data-cat="all" role="tab" aria-selected="true">All</button>
+      <button class="feat-tab" data-cat="RFM" role="tab" aria-selected="false">RFM</button>
+      <button class="feat-tab" data-cat="Behavioral" role="tab" aria-selected="false">Behavioral</button>
+      <button class="feat-tab" data-cat="Engagement" role="tab" aria-selected="false">Engagement</button>
+      <button class="feat-tab" data-cat="Temporal" role="tab" aria-selected="false">Temporal</button>
+      <button class="feat-tab" data-cat="Discount" role="tab" aria-selected="false">Discount</button>
+      <button class="feat-tab" data-cat="Demographics" role="tab" aria-selected="false">Demographics</button>
+    </div>
+
+    <!-- datasheet -->
+    <div class="reveal mt-8 border border-line2 rounded-lg overflow-hidden bg-card" data-delay="1">
+      <!-- header row (desktop) -->
+      <div class="hidden md:grid grid-cols-[3rem_minmax(0,15rem)_minmax(0,1fr)_6rem_8rem] items-center px-5 py-3 border-b border-line2 bg-paper2/50 label text-faint">
+        <span>#</span>
+        <span>Feature</span>
+        <span>Description</span>
+        <span>Type</span>
+        <span class="text-right">Category</span>
+      </div>
+      <div id="feat-rows"><!-- filled by JS --></div>
+    </div>
+
+    <!-- type legend -->
+    <div class="reveal mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 label text-faint" data-delay="2">
+      <span class="text-muted normal-case tracking-normal" style="font-size:12px;">Types:</span>
+      <span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-ink2"></span>int</span>
+      <span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-accent"></span>float</span>
+      <span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-slate"></span>str</span>
+      <span class="inline-flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-olive"></span>bool</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="architecture" class="relative py-20 md:py-28 border-t border-line2 bg-paper2/40">
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <div class="reveal max-w-2xl">
+      <p class="label text-accent">§ 02 — Architecture</p>
+      <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">One pipeline,<br class="hidden sm:block" /> two synchronized stores.</h2>
+      <p class="mt-5 max-w-xl text-muted leading-relaxed">Raw transactions flow through a single batch pipeline that writes both stores from the same definition — so the offline (training) and online (serving) paths never diverge.</p>
+    </div>
+
+    <!-- figure -->
+    <figure class="reveal mt-12 rounded-xl border border-line2 bg-card p-6 md:p-10" data-delay="1">
+      <div class="flex flex-col lg:flex-row lg:items-center gap-0">
+        <!-- CSV -->
+        <div class="arch-node flex-1">
+          <div class="node-card">
+            <span class="label text-faint">Source</span>
+            <h3 class="serif text-2xl text-ink mt-1">CSV Data</h3>
+            <p class="text-sm text-muted mt-1">Raw e-commerce transactions</p>
+          </div>
+        </div>
+        <div class="arch-link"><div class="pulse-x h-px w-full lg:w-full"></div></div>
+        <!-- Ingestion -->
+        <div class="arch-node flex-1">
+          <div class="node-card">
+            <span class="label text-faint">Step 01</span>
+            <h3 class="serif text-2xl text-ink mt-1">Ingestion</h3>
+            <p class="text-sm text-muted mt-1">Validate · clean · normalize</p>
+          </div>
+        </div>
+        <div class="arch-link"><div class="pulse-x h-px w-full"></div></div>
+        <!-- Pipeline -->
+        <div class="arch-node flex-1">
+          <div class="node-card node-card-accent">
+            <span class="label text-accent">Step 02</span>
+            <h3 class="serif text-2xl text-ink mt-1">Feature Pipeline</h3>
+            <p class="text-sm text-muted mt-1">Computes <span class="font-mono text-accent">23</span> features (batch)</p>
+          </div>
+        </div>
+        <div class="arch-link"><div class="pulse-x h-px w-full"></div></div>
+        <!-- Dual store -->
+        <div class="arch-node flex-[1.1]">
+          <div class="rounded-lg border border-line2 bg-paper2/50 p-2.5 space-y-2.5">
+            <div class="node-card !p-3.5 flex items-center justify-between">
+              <div><span class="label text-faint">Offline</span><h3 class="font-mono text-[15px] text-ink mt-0.5">PostgreSQL</h3></div>
+              <span class="h-2 w-2 rounded-full bg-slate"></span>
+            </div>
+            <div class="node-card !p-3.5 flex items-center justify-between">
+              <div><span class="label text-faint">Online</span><h3 class="font-mono text-[15px] text-ink mt-0.5">Redis</h3></div>
+              <span class="h-2 w-2 rounded-full bg-accent"></span>
+            </div>
+          </div>
+        </div>
+        <div class="arch-link"><div class="pulse-x h-px w-full"></div></div>
+        <!-- FastAPI -->
+        <div class="arch-node flex-1">
+          <div class="node-card">
+            <span class="label text-faint">Step 03</span>
+            <h3 class="serif text-2xl text-ink mt-1">FastAPI</h3>
+            <p class="text-sm text-muted mt-1">REST API · online + offline</p>
+          </div>
+        </div>
+        <div class="arch-link"><div class="pulse-x h-px w-full"></div></div>
+        <!-- Models -->
+        <div class="arch-node flex-1">
+          <div class="node-card">
+            <span class="label text-faint">Consumer</span>
+            <h3 class="serif text-2xl text-ink mt-1">ML Models</h3>
+            <p class="text-sm text-muted mt-1">Training & live inference</p>
+          </div>
+        </div>
+      </div>
+      <figcaption class="label text-faint mt-8 pt-5 border-t border-line">Fig. 01 — System topology · raw data → one pipeline → dual store → API → models</figcaption>
+    </figure>
+
+    <!-- legend columns -->
+    <div class="mt-10 grid md:grid-cols-3 gap-px bg-line2 border border-line2 rounded-lg overflow-hidden">
+      <div class="reveal bg-card p-7" data-delay="1">
+        <div class="flex items-center gap-2.5"><span class="h-2 w-2 rounded-full bg-slate"></span><span class="label text-muted">Offline · PostgreSQL 15</span></div>
+        <p class="mt-3 text-[15px] text-ink2 leading-relaxed">Full feature history for training and backfills. Built for large analytical scans, not latency.</p>
+      </div>
+      <div class="reveal bg-card p-7" data-delay="2">
+        <div class="flex items-center gap-2.5"><span class="h-2 w-2 rounded-full bg-accent"></span><span class="label text-muted">Online · Redis 7</span></div>
+        <p class="mt-3 text-[15px] text-ink2 leading-relaxed">Latest feature values keyed by user. Sub-millisecond reads to keep live inference fast.</p>
+      </div>
+      <div class="reveal bg-card p-7" data-delay="3">
+        <div class="flex items-center gap-2.5"><span class="h-2 w-2 rounded-full bg-ink2"></span><span class="label text-muted">Kept in sync</span></div>
+        <p class="mt-3 text-[15px] text-ink2 leading-relaxed">One pipeline writes both stores from a single definition — training and serving can't drift apart.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ API ============ -->
+<section id="api" class="relative py-20 md:py-28 border-t border-line2">
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <div class="reveal max-w-2xl">
+      <p class="label text-accent">§ 03 — API</p>
+      <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">A small, predictable surface.</h2>
+      <p class="mt-5 max-w-xl text-muted leading-relaxed">Five endpoints cover the read lifecycle — health, online and offline reads, batch lookups, and metadata. <span class="text-ink">Click any row to run it live</span> against the response panel.</p>
+    </div>
+
+    <div class="mt-12 grid lg:grid-cols-[0.92fr_1.08fr] gap-6 lg:gap-8 items-start">
+      <!-- endpoints (clickable — run live) -->
+      <div id="endpoint-list" class="reveal border border-line2 rounded-lg overflow-hidden bg-card divide-y divide-line">
+        <button type="button" class="endpoint w-full text-left" data-try="health"><span class="meth meth-get">GET</span><code>/health</code><span class="ep-note">service + deps</span></button>
+        <button type="button" class="endpoint endpoint-hi w-full text-left" data-try="online"><span class="meth meth-get">GET</span><code>/features/online/<span class="text-accent">{user_id}</span></code><span class="ep-note text-accent">redis → pg fallback</span></button>
+        <button type="button" class="endpoint w-full text-left" data-try="batch"><span class="meth meth-post">POST</span><code>/features/batch</code><span class="ep-note">multi-user</span></button>
+        <button type="button" class="endpoint w-full text-left" data-try="offline"><span class="meth meth-get">GET</span><code>/features/offline/<span class="text-slate">{user_id}</span></code><span class="ep-note">training data</span></button>
+        <button type="button" class="endpoint w-full text-left" data-try="metadata"><span class="meth meth-get">GET</span><code>/features/metadata</code><span class="ep-note">catalog</span></button>
+      </div>
+
+      <!-- dark code panel -->
+      <div class="reveal rounded-xl overflow-hidden border border-panel shadow-[0_30px_70px_-30px_rgba(28,27,23,0.5)]" data-delay="1" style="background:#1B1A15;">
+        <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#33312a;">
+          <span class="font-mono text-[11px]" style="color:#8C8576;">online_lookup.sh</span>
+          <button id="copy-btn" class="flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors" style="color:#8C8576;border:1px solid #33312a;">
+            <svg viewBox="0 0 16 16" class="h-3.5 w-3.5 stroke-current fill-none" stroke-width="1.3"><rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 11V4a1.5 1.5 0 0 1 1.5-1.5H11" stroke-linecap="round"/></svg>
+            <span id="copy-label">Copy</span>
+          </button>
+        </div>
+        <pre class="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-[1.7]"><code id="code-block"><span style="color:#8C8576;">$</span> <span style="color:#B6C09A;">curl</span> -s <span style="color:#D9A05B;">http://localhost:8000</span><span style="color:#ECE8DE;">/features/online/</span><span style="color:#D9A05B;">12345</span>
+
+<span style="color:#6f6a5e;">{</span>
+  <span style="color:#C98B6A;">"user_id"</span><span style="color:#6f6a5e;">:</span> <span style="color:#D9A05B;">12345</span><span style="color:#6f6a5e;">,</span>
+  <span style="color:#C98B6A;">"features"</span><span style="color:#6f6a5e;">:</span> <span style="color:#6f6a5e;">{</span>
+    <span style="color:#C98B6A;">"recency_days"</span><span style="color:#6f6a5e;">:</span> <span style="color:#D9A05B;">7</span><span style="color:#6f6a5e;">,</span>
+    <span style="color:#C98B6A;">"frequency_count"</span><span style="color:#6f6a5e;">:</span> <span style="color:#D9A05B;">23</span><span style="color:#6f6a5e;">,</span>
+    <span style="color:#C98B6A;">"monetary_total"</span><span style="color:#6f6a5e;">:</span> <span style="color:#D9A05B;">4521.30</span><span style="color:#6f6a5e;">,</span>
+    <span style="color:#C98B6A;">"preferred_category"</span><span style="color:#6f6a5e;">:</span> <span style="color:#B6C09A;">"Electronics"</span>
+  <span style="color:#6f6a5e;">},</span>
+  <span style="color:#C98B6A;">"metadata"</span><span style="color:#6f6a5e;">:</span> <span style="color:#6f6a5e;">{</span>
+    <span style="color:#C98B6A;">"computed_at"</span><span style="color:#6f6a5e;">:</span> <span style="color:#B6C09A;">"2026-05-31T03:00:00Z"</span><span style="color:#6f6a5e;">,</span>
+    <span style="color:#C98B6A;">"feature_version"</span><span style="color:#6f6a5e;">:</span> <span style="color:#B6C09A;">"v1"</span><span style="color:#6f6a5e;">,</span>
+    <span style="color:#C98B6A;">"source"</span><span style="color:#6f6a5e;">:</span> <span style="color:#B6C09A;">"redis"</span>
+  <span style="color:#6f6a5e;">}</span>
+<span style="color:#6f6a5e;">}</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="border-t border-line2 py-14">
+  <div class="mx-auto max-w-content px-5 md:px-8">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+      <div>
+        <div class="flex items-baseline gap-2.5">
+          <span class="serif text-2xl text-ink">Feature Store</span>
+          <span class="label text-faint">MVP</span>
+        </div>
+        <p class="mt-3 max-w-md text-sm text-muted leading-relaxed">A from-scratch feature store for e-commerce ML — the infrastructure layer between raw data and models.</p>
+      </div>
+      <a href="https://github.com" target="_blank" rel="noopener" class="label text-ink hover:text-accent transition-colors">View source ↗</a>
+    </div>
+    <div class="rule my-9"></div>
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 label text-faint">
+      <span class="normal-case tracking-normal" style="font-size:12px;">Built by <span class="text-ink">Nehemiah</span>.</span>
+      <span class="normal-case tracking-normal" style="font-size:12px;">Feature Store MVP · production ML infrastructure</span>
+    </div>
+  </div>
+</footer>
+</main>
+
+<!-- component styles -->
+<style>
+  .feat-tab {
+    font-family: '"IBM Plex Mono"', monospace; font-size: 12px; letter-spacing: 0.04em;
+    color: #6E6A5E; padding: 7px 15px; border-radius: 999px;
+    border: 1px solid #CDC6B5; background: transparent; transition: all .22s ease;
+  }
+  .feat-tab:hover { color: #1C1B17; border-color: #1C1B17; }
+  .feat-tab.is-active { color: #F4F1EA; background: #1C1B17; border-color: #1C1B17; }
+
+  .frow {
+    display: grid; align-items: center; padding: 14px 20px;
+    border-bottom: 1px solid #E0DBCF;
+    grid-template-columns: 3rem minmax(0,15rem) minmax(0,1fr) 6rem 8rem;
+  }
+  .frow:last-child { border-bottom: 0; }
+  .frow .fnum { font-family: '"IBM Plex Mono"', monospace; font-size: 12px; color: #928D7E; }
+  .frow .fname { font-family: '"IBM Plex Mono"', monospace; font-size: 13.5px; color: #1C1B17; word-break: break-word; }
+  .frow .fdesc { font-size: 14.5px; color: #6E6A5E; padding-right: 1rem; }
+  .frow .ftype { display: inline-flex; align-items: center; gap: 7px; font-family: '"IBM Plex Mono"', monospace; font-size: 12px; color: #3A372F; }
+  .frow .fcat { font-family: '"IBM Plex Mono"', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #928D7E; text-align: right; }
+  .tdot { height: 7px; width: 7px; border-radius: 999px; }
+  .t-int { background: #3A372F; } .t-float { background: #C0441D; } .t-str { background: #3C5A8C; } .t-bool { background: #5E7A45; }
+
+  @media (max-width: 767px) {
+    .frow { grid-template-columns: 1fr auto; gap: 4px 12px; padding: 16px 18px; }
+    .frow .fnum { display: none; }
+    .frow .fname { grid-column: 1; }
+    .frow .ftype { grid-column: 2; grid-row: 1; justify-self: end; }
+    .frow .fdesc { grid-column: 1 / -1; padding-right: 0; }
+    .frow .fcat { grid-column: 1 / -1; text-align: left; }
+  }
+
+  .node-card { border: 1px solid #CDC6B5; background: #FBFAF6; border-radius: 10px; padding: 18px; height: 100%; transition: border-color .25s ease, transform .25s ease; }
+  .node-card:hover { border-color: #C0441D; transform: translateY(-2px); }
+  .node-card-accent { border-color: #C0441D; box-shadow: inset 0 0 0 1px rgba(192,68,29,0.12); }
+
+  .arch-node { min-width: 0; }
+  .arch-link { display: flex; align-items: center; justify-content: center; }
+  /* desktop: horizontal connector */
+  @media (min-width: 1024px) { .arch-link { width: 34px; flex: 0 0 34px; } .arch-link > div { width: 100%; } }
+  /* mobile/tablet: vertical connector */
+  @media (max-width: 1023px) {
+    .arch-link { height: 30px; padding: 0; }
+    .arch-link > div { width: 1px !important; height: 100%; }
+    .arch-link .pulse-x::after { width: 100% !important; height: 26px; left: 0 !important; top: -26px; background: linear-gradient(180deg, transparent, #C0441D, transparent); animation: runy 2.8s cubic-bezier(.4,0,.2,1) infinite; }
+  }
+
+  .endpoint { display: flex; align-items: center; gap: 14px; padding: 15px 20px; }
+  .endpoint-hi { background: rgba(192,68,29,0.04); }
+  .endpoint code { font-family: '"IBM Plex Mono"', monospace; font-size: 13.5px; color: #1C1B17; }
+  .endpoint .ep-note { margin-left: auto; font-family: '"IBM Plex Mono"', monospace; font-size: 11px; color: #928D7E; }
+  .meth { font-family: '"IBM Plex Mono"', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 5px; }
+  .meth-get { color: #3C5A8C; background: rgba(60,90,140,0.1); }
+  .meth-post { color: #C0441D; background: rgba(192,68,29,0.1); }
+  .meth-admin { color: #8a6d1f; background: rgba(180,140,40,0.12); }
+  @media (max-width: 520px) { .endpoint .ep-note { display: none; } }
+</style>
+
+<script>
+(function () {
+  'use strict';
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Hero feature-stream video (honor reduced motion) ---------- */
+  var hv = document.getElementById('hero-stream');
+  if (hv && reduceMotion) { try { hv.pause(); hv.removeAttribute('autoplay'); } catch (e) {} }
+
+  /* ---------- Header scroll state ---------- */
+  var hdr = document.getElementById('hdr');
+  function onScroll() {
+    if (window.scrollY > 16) {
+      hdr.classList.add('bg-paper/85','border-line2');
+      hdr.style.backdropFilter = 'blur(10px)';
+      hdr.classList.remove('border-transparent');
+    } else {
+      hdr.classList.remove('bg-paper/85','border-line2');
+      hdr.style.backdropFilter = 'none';
+      hdr.classList.add('border-transparent');
+    }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* ---------- Scroll reveal (with safety nets) ---------- */
+  var revealEls = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !reduceMotion) {
+    var ro = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-in'); ro.unobserve(e.target); } });
+    }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
+    revealEls.forEach(function (el) { ro.observe(el); });
+    document.querySelectorAll('#hero .reveal').forEach(function (el) { el.classList.add('is-in'); });
+    setTimeout(function () { document.querySelectorAll('.reveal:not(.is-in)').forEach(function (el) { el.classList.add('is-in'); }); }, 1600);
+  } else {
+    revealEls.forEach(function (el) { el.classList.add('is-in'); });
+  }
+
+  /* ---------- Count-up ---------- */
+  function countUp(el) {
+    var target = parseFloat(el.getAttribute('data-count'));
+    if (reduceMotion) { el.textContent = target; return; }
+    var dur = 1300, start = null;
+    function step(ts) {
+      if (!start) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step); else el.textContent = target;
+    }
+    requestAnimationFrame(step);
+  }
+  var counters = document.querySelectorAll('[data-count]');
+  if ('IntersectionObserver' in window) {
+    var co = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { countUp(e.target); co.unobserve(e.target); } });
+    }, { threshold: 0.6 });
+    counters.forEach(function (el) { co.observe(el); });
+    setTimeout(function () {
+      counters.forEach(function (el) { if (el.textContent.trim() === '0') countUp(el); });
+    }, 1700);
+  } else { counters.forEach(countUp); }
+
+  /* ---------- Hero live-lookup figure ---------- */
+  var LOOKUP = [
+    ['recency_days', 7, 'int'],
+    ['frequency_count', 23, 'int'],
+    ['monetary_total', '$4,521.30', 'float'],
+    ['avg_review_score', '4.6', 'float'],
+    ['preferred_category', 'Electronics', 'str'],
+    ['is_active_30d', 'true', 'bool']
+  ];
+  var lr = document.getElementById('lookup-rows');
+  if (lr) {
+    lr.innerHTML = LOOKUP.map(function (f) {
+      var valColor = f[2] === 'str' ? 'color:#3C5A8C;' : (f[2] === 'bool' ? 'color:#5E7A45;' : (f[2] === 'float' ? 'color:#C0441D;' : 'color:#1C1B17;'));
+      return '<div class="flex items-center justify-between gap-4 py-2.5 border-b border-line last:border-0">' +
+        '<code class="font-mono text-[12.5px] text-muted">' + f[0] + '</code>' +
+        '<span class="font-mono text-[13px] font-medium tabular-nums" style="' + valColor + '">' + f[1] + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* ---------- Feature catalog ---------- */
+  var FEATURES = [
+    ['recency_days', "Days since the user's most recent purchase", 'int', 'RFM'],
+    ['frequency_count', 'Total number of purchase transactions', 'int', 'RFM'],
+    ['monetary_total', 'Sum of all transaction amounts (lifetime spend)', 'float', 'RFM'],
+    ['monetary_avg_per_purchase', 'Average order value per transaction', 'float', 'RFM'],
+    ['monetary_max', 'Largest single transaction amount', 'float', 'RFM'],
+    ['preferred_category', 'Product category purchased most often', 'str', 'Behavioral'],
+    ['preferred_device', 'Device type used most often', 'str', 'Behavioral'],
+    ['preferred_referral', 'Referral source driving the most purchases', 'str', 'Behavioral'],
+    ['category_diversity_count', 'Number of distinct categories purchased', 'int', 'Behavioral'],
+    ['product_diversity_count', 'Number of distinct products purchased', 'int', 'Behavioral'],
+    ['avg_session_duration', 'Average session length in minutes', 'float', 'Engagement'],
+    ['avg_review_score', 'Average review score (1–5) given', 'float', 'Engagement'],
+    ['total_reviews_given', 'Total number of reviews written', 'int', 'Engagement'],
+    ['positive_review_ratio', 'Fraction of reviews scored ≥ 4', 'float', 'Engagement'],
+    ['days_since_signup', 'Days from signup to most recent purchase', 'int', 'Temporal'],
+    ['is_active_30d', 'Whether last login is within 30 days', 'bool', 'Temporal'],
+    ['purchase_velocity', 'Average purchases per active month', 'float', 'Temporal'],
+    ['discount_usage_rate', 'Fraction of purchases with a discount', 'float', 'Discount'],
+    ['avg_discount_rate', 'Average discount % on discounted purchases', 'float', 'Discount'],
+    ['total_savings', 'Total savings from discounts', 'float', 'Discount'],
+    ['age', 'User age in years', 'int', 'Demographics'],
+    ['country', "User's registered country", 'str', 'Demographics'],
+    ['gender', "User's self-reported gender", 'str', 'Demographics']
+  ];
+  var rowsEl = document.getElementById('feat-rows');
+  rowsEl.innerHTML = FEATURES.map(function (f, i) {
+    var n = String(i + 1).padStart(2, '0');
+    return '<div class="frow" data-cat="' + f[3] + '">' +
+      '<span class="fnum">' + n + '</span>' +
+      '<span class="fname">' + f[0] + '</span>' +
+      '<span class="fdesc">' + f[1] + '</span>' +
+      '<span class="ftype"><span class="tdot t-' + f[2] + '"></span>' + f[2] + '</span>' +
+      '<span class="fcat">' + f[3] + '</span>' +
+    '</div>';
+  }).join('');
+
+  var tabs = document.querySelectorAll('.feat-tab');
+  var countEl = document.getElementById('feat-count');
+  function applyFilter(cat) {
+    var shown = 0;
+    rowsEl.querySelectorAll('.frow').forEach(function (r) {
+      var match = (cat === 'all') || (r.getAttribute('data-cat') === cat);
+      r.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    countEl.textContent = shown;
+  }
+  // Exposed so the live-data layer can re-apply the active filter after it
+  // re-renders the catalog rows from /features/metadata.
+  window.__applyFeatFilter = function () {
+    var active = document.querySelector('.feat-tab.is-active');
+    applyFilter(active ? active.getAttribute('data-cat') : 'all');
+  };
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) { t.classList.remove('is-active'); t.setAttribute('aria-selected', 'false'); });
+      tab.classList.add('is-active'); tab.setAttribute('aria-selected', 'true');
+      applyFilter(tab.getAttribute('data-cat'));
+    });
+  });
+
+  /* ---------- Copy button ---------- */
+  var copyBtn = document.getElementById('copy-btn');
+  var copyLabel = document.getElementById('copy-label');
+  copyBtn.addEventListener('click', function () {
+    var text = document.getElementById('code-block').innerText;
+    var done = function () {
+      copyLabel.textContent = 'Copied';
+      copyBtn.style.color = '#D9A05B'; copyBtn.style.borderColor = '#D9A05B';
+      setTimeout(function () { copyLabel.textContent = 'Copy'; copyBtn.style.color = '#8C8576'; copyBtn.style.borderColor = '#33312a'; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else {
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); done();
+    }
+  });
+})();
+</script>
+
+<!-- ============ LIVE DATA LAYER — wires the page to the FastAPI backend ============ -->
+<script>
+(function () {
+  'use strict';
+
+  // Same origin when served by FastAPI (uvicorn src.api.main:app); falls back
+  // to localhost:8000 when the file is opened directly. CORS covers the latter.
+  var API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://localhost:8000';
+  var ORIGIN = API_BASE || location.origin;
+  var OFFLINE = { error: 'API offline — start it with: uvicorn src.api.main:app' };
+
+  function $(id) { return document.getElementById(id); }
+
+  function apiFetch(path, opts) {
+    var t0 = performance.now();
+    return fetch(API_BASE + path, opts || {}).then(function (res) {
+      return res.text().then(function (txt) {
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = null; }
+        return { ok: res.ok, status: res.status, data: data, ms: Math.round(performance.now() - t0) };
+      });
+    });
+  }
+
+  /* ---------- escaping + JSON syntax highlight for the response panel ---------- */
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function highlight(jsonText) {
+    return esc(jsonText).replace(
+      /("(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g,
+      function (m) {
+        var color = '#D9A05B';
+        if (/^"/.test(m)) { color = /:$/.test(m) ? '#C98B6A' : '#B6C09A'; }
+        else if (m === 'true' || m === 'false') { color = '#5E7A45'; }
+        else if (m === 'null') { color = '#8C8576'; }
+        return '<span style="color:' + color + ';">' + m + '</span>';
+      }
+    );
+  }
+
+  var codeBlock = $('code-block');
+  function showResponse(method, path, status, data, ms) {
+    if (!codeBlock) return;
+    var head = '<span style="color:#8C8576;">$</span> <span style="color:#B6C09A;">curl</span> -s' +
+      (method === 'GET' ? '' : ' -X ' + method) +
+      ' <span style="color:#D9A05B;">' + esc(ORIGIN) + '</span><span style="color:#ECE8DE;">' + esc(path) + '</span>';
+    var ok = (typeof status === 'number' && status >= 200 && status < 300);
+    var statusLine = '<span style="color:' + (ok ? '#5E7A45' : '#C0441D') + ';"># ' + esc(status) +
+      (ms != null ? '  ·  ' + ms + 'ms' : '') + '</span>';
+    var body = data == null ? '' : highlight(JSON.stringify(data, null, 2));
+    codeBlock.innerHTML = head + '\n\n' + statusLine + '\n' + body;
+  }
+
+  /* ---------- header health badge ---------- */
+  var hDot = $('api-status-dot'), hText = $('api-status-text');
+  function setBadge(color, text) {
+    if (!hDot) return;
+    hDot.className = 'h-1.5 w-1.5 rounded-full bg-' + color;
+    hText.textContent = text;
+    hText.className = (color === 'olive') ? 'text-muted' : (color === 'accent' ? 'text-accent' : 'text-faint');
+  }
+  function refreshHealth() {
+    apiFetch('/health').then(function (r) {
+      if (r.ok && r.data && r.data.status === 'healthy') setBadge('olive', 'API live');
+      else setBadge('accent', 'API degraded');
+    }).catch(function () { setBadge('faint', 'API offline'); });
+  }
+
+  /* ---------- live feature catalog (fallback: the static rows already rendered) ---------- */
+  var featRows = $('feat-rows'), featCount = $('feat-count');
+  function categoryMap() {
+    var map = {};
+    featRows.querySelectorAll('.frow').forEach(function (r) {
+      var n = r.querySelector('.fname'); if (n) map[n.textContent] = r.getAttribute('data-cat');
+    });
+    return map;
+  }
+  function refreshCatalog() {
+    var name2cat = categoryMap();
+    apiFetch('/features/metadata').then(function (r) {
+      if (!(r.ok && r.data && r.data.features && r.data.features.length)) return;
+      featRows.innerHTML = r.data.features.map(function (f, i) {
+        var cat = name2cat[f.name] || '—';
+        return '<div class="frow" data-cat="' + esc(cat) + '">' +
+          '<span class="fnum">' + String(i + 1).padStart(2, '0') + '</span>' +
+          '<span class="fname">' + esc(f.name) + '</span>' +
+          '<span class="fdesc">' + esc(f.description) + '</span>' +
+          '<span class="ftype"><span class="tdot t-' + esc(f.data_type) + '"></span>' + esc(f.data_type) + '</span>' +
+          '<span class="fcat">' + esc(cat) + '</span>' +
+        '</div>';
+      }).join('');
+      if (featCount) featCount.textContent = r.data.features.length;
+      if (window.__applyFeatFilter) window.__applyFeatFilter();
+    }).catch(function () { /* keep static rows */ });
+  }
+
+  /* ---------- live hero lookup ---------- */
+  var lookupRows = $('lookup-rows'), sDot = $('status-dot'), sText = $('status-text');
+  var lkSource = $('lk-source'), lkVersion = $('lk-version'), lkComputed = $('lk-computed');
+  var uidInput = $('uid-input'), form = $('lookup-form');
+  var HERO_ORDER = ['recency_days', 'frequency_count', 'monetary_total', 'avg_review_score', 'preferred_category', 'is_active_30d'];
+
+  function typeColor(v) {
+    if (typeof v === 'boolean') return 'color:#5E7A45;';
+    if (typeof v === 'number') return Number.isInteger(v) ? 'color:#1C1B17;' : 'color:#C0441D;';
+    return 'color:#3C5A8C;';
+  }
+  function fmt(v) { return (typeof v === 'number' && !Number.isInteger(v)) ? v.toFixed(2) : String(v); }
+  function orderedKeys(feat) {
+    var head = HERO_ORDER.filter(function (k) { return k in feat; });
+    var rest = Object.keys(feat).filter(function (k) { return head.indexOf(k) < 0; });
+    return head.concat(rest).slice(0, 6);
+  }
+  function renderHeroFeatures(feat) {
+    lookupRows.innerHTML = orderedKeys(feat).map(function (k) {
+      return '<div class="flex items-center justify-between gap-4 py-2.5 border-b border-line last:border-0">' +
+        '<code class="font-mono text-[12.5px] text-muted">' + esc(k) + '</code>' +
+        '<span class="font-mono text-[13px] font-medium tabular-nums" style="' + typeColor(feat[k]) + '">' + esc(fmt(feat[k])) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+  function setStatus(color, label, ms) {
+    if (sDot) sDot.className = 'h-1.5 w-1.5 rounded-full bg-' + color;
+    if (sText) sText.innerHTML = esc(label) + ' · <span id="lat">' + (ms != null ? ms : '—') + '</span>ms';
+  }
+  function setMeta(meta) {
+    if (lkSource) lkSource.textContent = (meta && meta.source) || '—';
+    if (lkVersion) lkVersion.textContent = (meta && meta.feature_version) || '—';
+    if (lkComputed) lkComputed.textContent = (meta && meta.computed_at) ? ('computed ' + meta.computed_at) : '—';
+  }
+
+  function runLookup(uid) {
+    uid = String(uid || '').trim() || '12345';
+    setStatus('faint', '…', null);
+    var path = '/features/online/' + encodeURIComponent(uid);
+    apiFetch(path).then(function (r) {
+      if (r.ok && r.data) {
+        renderHeroFeatures(r.data.features || {});
+        setMeta(r.data.metadata);
+        setStatus('olive', String(r.status), r.ms);
+      } else if (r.status === 404) {
+        lookupRows.innerHTML = '<div class="py-6 text-center font-mono text-[12.5px] text-muted">user ' + esc(uid) + ' not found</div>';
+        setMeta(null);
+        setStatus('accent', '404', r.ms);
+      } else {
+        setStatus('accent', String(r.status || 'ERR'), r.ms);
+      }
+      showResponse('GET', path, r.status, r.data, r.ms);
+    }).catch(function () {
+      setStatus('faint', 'offline · sample', null);
+      showResponse('GET', path, 'offline', OFFLINE, null);
+    });
+  }
+
+  if (form) form.addEventListener('submit', function (e) { e.preventDefault(); runLookup(uidInput.value); });
+
+  /* ---------- clickable endpoint rows ---------- */
+  function runGeneric(method, path, body) {
+    var opts = { method: method, headers: { 'Accept': 'application/json' } };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    apiFetch(path, opts)
+      .then(function (r) { showResponse(method, path, r.status, r.data, r.ms); })
+      .catch(function () { showResponse(method, path, 'offline', OFFLINE, null); });
+  }
+  var epList = $('endpoint-list');
+  if (epList) {
+    epList.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-try]'); if (!btn) return;
+      var uid = ((uidInput && uidInput.value) || '12345').trim();
+      var n = parseInt(uid, 10) || 1;
+      var kind = btn.getAttribute('data-try');
+      if (kind === 'health') runGeneric('GET', '/health');
+      else if (kind === 'metadata') runGeneric('GET', '/features/metadata');
+      else if (kind === 'online') runLookup(uid);
+      else if (kind === 'offline') runGeneric('GET', '/features/offline/' + encodeURIComponent(uid));
+      else if (kind === 'batch') runGeneric('POST', '/features/batch', { user_ids: [n, n + 1, n + 2] });
+      if (codeBlock && codeBlock.scrollIntoView) codeBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
+  /* ---------- kick off ---------- */
+  setMeta({ source: 'redis', feature_version: 'v1' });   // sensible defaults until a live call resolves
+  refreshHealth();
+  refreshCatalog();
+  runLookup(uidInput ? uidInput.value : '12345');
+})();
+</script>
+
+</body>
+</html>
