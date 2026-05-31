@@ -9,6 +9,7 @@
 > **Full specification:** [`PRD.md`](PRD.md) · **Engineering conventions:** [`CLAUDE.md`](CLAUDE.md)
 
 ---
+hash
 
 ## Architecture
 
