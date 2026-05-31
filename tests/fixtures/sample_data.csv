@@ -1,0 +1,11 @@
+UserID,UserName,Age,Gender,Country,SignUpDate,ProductID,ProductName,Category,Price,PurchaseDate,Quantity,TotalAmount,HasDiscountApplied,DiscountRate,ReviewScore,ReviewText,LastLogin,SessionDuration,DeviceType,ReferralSource
+1,User_1,25,Male,USA,2020-03-15,1001,Laptop,Electronics,999.99,2021-06-10,1,999.99,False,0.0,4.5,Excellent,2024-01-15 10:30:00,45.0,Desktop,Organic Search
+2,User_2,32,Female,Canada,2021-01-20,1002,Smartphone,Electronics,599.99,2021-08-22,1,599.99,True,0.2,3.2,Good,2024-02-10 14:20:00,30.0,Mobile,Ad Campaign
+3,User_3,19,Non-Binary,UK,2020-07-01,2001,T-shirt,Apparel,29.99,2021-05-15,2,59.98,True,0.1,5.0,Excellent,2024-01-28 09:15:00,22.0,Tablet,Social Media
+4,User_4,45,Male,Australia,2020-11-30,3001,Book,Books,14.99,2021-09-01,3,44.97,False,0.0,-0.6,Poor,2024-03-01 16:00:00,60.0,Desktop,Email Marketing
+5,User_5,28,Female,India,2021-05-10,4001,Watch,Accessories,249.99,2021-11-20,1,249.99,True,0.3,8.6,Excellent,2024-01-05 11:45:00,35.0,Mobile,Organic Search
+6,User_6,55,Male,Germany,2020-02-14,1003,Headphones,Electronics,149.99,2021-03-08,1,149.99,False,0.0,2.0,Poor,2024-02-20 08:30:00,90.0,Desktop,Ad Campaign
+7,User_7,22,Female,USA,2021-08-22,2002,Shoes,Apparel,79.99,2021-12-25,2,159.98,True,0.15,1.0,Poor,2024-01-10 13:00:00,18.0,Mobile,Social Media
+8,User_8,38,Non-Binary,Canada,2020-09-05,1004,Laptop,Electronics,879.99,2021-07-14,1,879.99,True,0.1,4.2,Good,2024-03-15 17:30:00,55.0,Desktop,Email Marketing
+9,User_9,50,Male,UK,2021-03-18,3002,Book,Books,24.99,2021-10-30,4,99.96,False,0.0,6.5,Good,2024-02-05 12:15:00,40.0,Tablet,Organic Search
+10,User_10,29,Female,Australia,2020-12-01,4002,Watch,Accessories,199.99,2021-04-05,1,199.99,True,0.25,0.5,Average,2024-01-22 15:45:00,28.0,Mobile,Ad Campaign

@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "feature-store-mvp"
+version = "0.1.0"
+description = "Production-grade feature store MVP for e-commerce ML serving"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Nehemiah" }]
+
+# Runtime dependencies — see PRD.md § 8 (Python Dependencies).
+dependencies = [
+    "pandas>=2.1.0",
+    "polars>=0.20.0",
+    "pydantic>=2.5.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "redis>=5.0.0",
+    "alembic>=1.13.0",
+    "prefect>=2.14.0",
+    "streamlit>=1.31.0",
+    "evidently>=0.4.0",
+    "plotly>=5.18.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    # pydantic-settings is a separate package in Pydantic v2; needed for src/config.py.
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
+    "ruff>=0.2.0",
+    "black>=24.0.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+    # testcontainers[postgres] is used by tests/integration/ to spin up a real DB.
+    "testcontainers[postgres]>=4.4.0",
+    # fakeredis backs the online store unit tests without a running Redis server.
+    "fakeredis>=2.20.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+# --- Black ---------------------------------------------------------------
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+# --- Ruff ----------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Rule families per PRD.md § 15: pycodestyle, pyflakes, isort, pep8-naming,
+# warnings, bugbear, comprehensions, pyupgrade, simplify, bandit-security.
+select = ["E", "F", "I", "N", "W", "B", "C4", "UP", "SIM", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately use `assert` (S101) and may hardcode sample values.
+"tests/**/*.py" = ["S101"]
+
+# --- Mypy ----------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+# Many ML/data libraries ship without type stubs; skip those rather than
+# failing the strict run on third-party gaps.
+ignore_missing_imports = true
+
+# --- Pytest --------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing"
+asyncio_mode = "auto"
+# Add project root to sys.path so `from src.xxx import` works without editable install.
+pythonpath = ["."]
