@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Feature Store MVP — One definition. Two stores. Zero skew.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   FEATURE STORE MVP — mission-control HUD over a data stream
+   Palette: near-black + ONE amber signal accent + off-white
+   ============================================================ */
+:root{
+  --bg:#0a0a09;
+  --ink:#ECEAE3;          /* off-white */
+  --muted:#8f8b80;        /* secondary gray */
+  --faint:#5c594f;        /* tertiary */
+  --accent:#FF6A1A;       /* the single signal accent (derive from video hue) */
+  --accent-soft:#ff8a47;
+  --line:rgba(236,234,227,.12);
+  --line-2:rgba(236,234,227,.07);
+  --panel:rgba(13,12,11,.55);
+  --panel-2:rgba(20,18,16,.66);
+  --redis:#FF6A1A;
+  --pg:#7fb3ff;           /* postgres tag — used ONLY as a tiny data-source token */
+  --glass-blur:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:14px;line-height:1.5;letter-spacing:.01em;
+  overflow:hidden; /* viewport-first: no long page scroll */
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+h1,h2,h3{font-family:"Space Grotesk",sans-serif;margin:0;font-weight:600;letter-spacing:-.01em}
+button,input{font-family:inherit;color:inherit}
+::selection{background:var(--accent);color:#0a0a09}
+
+/* ---------- background stack ---------- */
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:#070707}
+/* dark animated gradient: first-paint poster + fallback when no video */
+.bg__gradient{
+  position:absolute;inset:-20%;
+  background:
+    radial-gradient(60% 50% at 20% 30%, rgba(255,106,26,.10), transparent 60%),
+    radial-gradient(50% 60% at 80% 70%, rgba(255,106,26,.06), transparent 60%),
+    linear-gradient(120deg,#0a0a09,#0e0c0a 40%,#080807 100%);
+  filter:saturate(1.05);
+  animation:drift 28s ease-in-out infinite alternate;
+}
+@keyframes drift{
+  0%{transform:translate3d(-2%,-1%,0) scale(1.05)}
+  100%{transform:translate3d(2%,2%,0) scale(1.12)}
+}
+.bg__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.2s ease}
+.bg__video.ready{opacity:1}
+/* scrim keeps text legible over the stream */
+.bg__scrim{position:absolute;inset:0;background:
+  linear-gradient(180deg, rgba(5,5,5,.78) 0%, rgba(5,5,5,.55) 35%, rgba(5,5,5,.62) 75%, rgba(5,5,5,.85) 100%);}
+.bg__vignette{position:absolute;inset:0;box-shadow:inset 0 0 240px 60px rgba(0,0,0,.7);pointer-events:none}
+/* subtle film grain */
+.bg__grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:overlay;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+/* ---------- app frame ---------- */
+.app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+  padding:clamp(14px,2.2vh,26px) clamp(16px,3vw,42px);gap:clamp(10px,1.6vh,18px)}
+
+/* hairline meta strip helpers */
+.kicker{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
+.tick{color:var(--accent)}
+
+/* ---------- header ---------- */
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex:none}
+.brand{display:flex;flex-direction:column;gap:6px}
+.brand__row{display:flex;align-items:center;gap:12px}
+.glyph{width:26px;height:26px;flex:none;position:relative}
+.glyph::before,.glyph::after{content:"";position:absolute;inset:0;border:1.5px solid var(--accent)}
+.glyph::before{transform:translate(-3px,-3px);opacity:.45}
+.glyph::after{transform:translate(3px,3px);background:rgba(255,106,26,.06)}
+.wordmark{font-family:"Space Grotesk";font-weight:700;font-size:18px;letter-spacing:.02em}
+.wordmark b{color:var(--accent);font-weight:700}
+.tagline{font-size:11px;color:var(--muted);letter-spacing:.16em;text-transform:uppercase}
+.tagline em{color:var(--ink);font-style:normal}
+
+.health{display:flex;align-items:center;gap:10px;padding:8px 13px;border:1px solid var(--line);
+  background:var(--panel);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));
+  font-size:11px;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.health__dot{width:8px;height:8px;border-radius:50%;background:var(--faint);position:relative;flex:none}
+.health.live .health__dot{background:var(--accent);box-shadow:0 0 0 0 rgba(255,106,26,.55);animation:ping 1.8s ease-out infinite}
+.health.degraded .health__dot{background:var(--accent-soft);opacity:.7}
+.health.offline .health__dot{background:transparent;border:1.5px solid var(--faint)}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,106,26,.5)}70%{box-shadow:0 0 0 7px rgba(255,106,26,0)}100%{box-shadow:0 0 0 0 rgba(255,106,26,0)}}
+.health__label b{color:var(--ink);font-weight:600}
+.health__rtt{color:var(--muted)}
+
+/* ---------- bubble pills ---------- */
+.pills{display:flex;flex-wrap:wrap;gap:10px;flex:none}
+.pill{display:inline-flex;align-items:center;gap:9px;cursor:pointer;
+  padding:9px 16px 9px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--panel);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));
+  color:var(--ink);font-size:12.5px;letter-spacing:.02em;
+  transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.pill:hover,.pill:focus-visible{border-color:rgba(255,106,26,.55);background:rgba(28,20,14,.66);transform:translateY(-1px);outline:none;box-shadow:0 6px 24px -12px rgba(255,106,26,.5)}
+.pill:focus-visible{box-shadow:0 0 0 2px rgba(255,106,26,.6)}
+.pill__n{font-size:10px;color:var(--accent);letter-spacing:.06em}
+.pill__ext{color:var(--muted);font-size:11px;margin-left:1px}
+
+/* ---------- main stage ---------- */
+.stage{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(12px,1.6vw,22px)}
+.panel{position:relative;display:flex;flex-direction:column;min-height:0;
+  border:1px solid var(--line);background:var(--panel-2);
+  backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur))}
+/* corner ticks */
+.panel::before,.panel::after{content:"";position:absolute;width:9px;height:9px;border:1px solid var(--accent);opacity:.5}
+.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.panel__head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--line);flex:none}
+.panel__title{display:flex;align-items:baseline;gap:10px}
+.panel__title h2{font-size:15px;letter-spacing:.04em}
+.panel__idx{font-size:11px;color:var(--accent);letter-spacing:.1em}
+.panel__hint{font-size:10.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.panel__body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+
+/* ---------- lookup ---------- */
+.lookup__bar{display:flex;gap:10px;padding:16px 18px 14px;align-items:stretch;flex:none}
+.field{flex:1 1 auto;display:flex;flex-direction:column;gap:5px}
+.field label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.field .inp{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:rgba(0,0,0,.35);padding:0 12px;height:42px}
+.field .inp .gt{color:var(--accent)}
+.field input{border:0;background:transparent;outline:none;font-size:15px;letter-spacing:.04em;width:100%;height:100%}
+.field input::placeholder{color:var(--faint)}
+.run{flex:none;align-self:flex-end;height:42px;padding:0 22px;border:1px solid var(--accent);
+  background:var(--accent);color:#120800;font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;display:inline-flex;align-items:center;gap:9px;transition:filter .15s,transform .12s}
+.run:hover{filter:brightness(1.08)}
+.run:active{transform:translateY(1px)}
+.run:disabled{opacity:.6;cursor:wait}
+.run__spin{width:11px;height:11px;border:2px solid rgba(18,8,0,.4);border-top-color:#120800;border-radius:50%;animation:spin .7s linear infinite;display:none}
+.run.busy .run__spin{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.req{display:flex;align-items:center;gap:10px;padding:0 18px 12px;flex-wrap:wrap;flex:none}
+.method{font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--accent);border:1px solid rgba(255,106,26,.45);padding:2px 7px}
+.req__path{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.req__path b{color:var(--ink)}
+
+.meta-row{display:flex;gap:10px;padding:0 18px 12px;flex:none;flex-wrap:wrap}
+.stat{border:1px solid var(--line);background:rgba(0,0,0,.3);padding:8px 12px;min-width:96px}
+.stat__k{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.stat__v{font-size:17px;font-weight:600;margin-top:2px;display:flex;align-items:baseline;gap:4px}
+.stat__v small{font-size:11px;color:var(--muted);font-weight:400}
+.src-redis{color:var(--accent)}
+.src-postgres{color:var(--pg)}
+.badge-fallback{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-soft);border:1px dashed rgba(255,138,71,.5);padding:2px 6px;align-self:center}
+
+.rows{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 18px 16px;
+  display:grid;grid-template-columns:1fr;gap:0}
+.rows__cat{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);
+  padding:12px 0 4px;border-bottom:1px solid var(--line-2);position:sticky;top:0;background:linear-gradient(180deg,rgba(20,18,16,.96),rgba(20,18,16,.8));backdrop-filter:blur(4px)}
+.frow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;
+  padding:9px 2px;border-bottom:1px solid var(--line-2);
+  opacity:0;transform:translateY(6px);animation:flowin .42s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes flowin{to{opacity:1;transform:none}}
+.frow__name{font-size:12.5px;color:var(--ink)}
+.frow__desc{font-size:10px;color:var(--faint);margin-top:1px;letter-spacing:.01em}
+.frow__val{font-size:13.5px;font-weight:600;color:var(--accent-soft);text-align:right;white-space:nowrap}
+.frow__val.is-str{color:var(--ink)}
+.frow__val.is-bool{color:var(--ink)}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--faint);font-size:12px;padding:24px;letter-spacing:.04em}
+.empty span{color:var(--muted)}
+
+/* scrollbars */
+.rows::-webkit-scrollbar,.cat__list::-webkit-scrollbar{width:8px}
+.rows::-webkit-scrollbar-thumb,.cat__list::-webkit-scrollbar-thumb{background:rgba(255,106,26,.25);border-radius:8px}
+.rows::-webkit-scrollbar-track,.cat__list::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- catalog ---------- */
+.tabs{display:flex;gap:0;padding:12px 18px 0;flex-wrap:wrap;flex:none;border-bottom:1px solid var(--line)}
+.tab{cursor:pointer;border:0;background:transparent;color:var(--muted);font-size:11px;letter-spacing:.06em;
+  padding:7px 11px;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .cnt{color:var(--faint);font-size:10px;margin-left:5px}
+.tab[aria-selected="true"] .cnt{color:var(--accent)}
+
+.cat__list{flex:1 1 auto;min-height:0;overflow-y:auto}
+.crow{display:grid;grid-template-columns:1.3fr .8fr 1.6fr;gap:14px;align-items:center;
+  padding:11px 18px;border-bottom:1px solid var(--line-2);transition:background .15s}
+.crow:hover{background:rgba(255,106,26,.05)}
+.crow__name{font-size:12.5px;color:var(--ink);letter-spacing:.01em}
+.crow__cat{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);justify-self:start;border:1px solid var(--line);padding:2px 7px}
+.crow__desc{font-size:11px;color:var(--muted);line-height:1.45}
+.cat__foot{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-top:1px solid var(--line);flex:none;font-size:10.5px;color:var(--muted);letter-spacing:.06em}
+
+/* ---------- footer ---------- */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex:none;font-size:10.5px;color:var(--muted);letter-spacing:.08em}
+.foot a{color:var(--ink);text-decoration:none;border-bottom:1px solid rgba(255,106,26,.5);padding-bottom:1px}
+.foot a:hover{color:var(--accent)}
+.foot__skew{color:var(--accent);text-transform:uppercase;letter-spacing:.2em;font-size:10px}
+
+/* ---------- modals ---------- */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(4,4,4,.55);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:24px}
+.scrim.open{display:flex;animation:fade .2s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{display:none;width:min(820px,94vw);max-height:86vh;overflow:auto;position:relative;
+  border:1px solid var(--line);background:rgba(14,12,11,.86);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);box-shadow:0 40px 120px -30px rgba(0,0,0,.9);animation:rise .26s cubic-bezier(.2,.7,.2,1)}
+.modal.open{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:none}}
+.modal::before{content:"";position:absolute;top:-1px;left:-1px;width:12px;height:12px;border:1px solid var(--accent);border-right:0;border-bottom:0;opacity:.6}
+.modal__head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 26px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(14,12,11,.9);backdrop-filter:blur(8px)}
+.modal__ey{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent)}
+.modal__head h2{font-size:23px;margin-top:7px;letter-spacing:-.01em}
+.x{flex:none;width:34px;height:34px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-size:16px;transition:.15s}
+.x:hover{border-color:var(--accent);color:var(--accent)}
+.modal__body{padding:22px 26px 28px;font-size:13.5px;line-height:1.7;color:#d9d6cd}
+.modal__body p{margin:0 0 14px}
+.modal__body strong{color:var(--ink);font-weight:600}
+.modal__body .hot{color:var(--accent)}
+.steps{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:0}
+.steps li{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+.steps .num{font-family:"JetBrains Mono";color:var(--accent);font-size:12px}
+.steps b{font-family:"Space Grotesk";color:var(--ink);font-weight:600}
+.steps .d{color:var(--muted);font-size:12px;display:block;margin-top:2px}
+.why{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.why__card{border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px 15px}
+.why__card .n{font-size:11px;color:var(--accent);letter-spacing:.1em}
+.why__card .h{font-family:"Space Grotesk";font-size:14px;color:var(--ink);margin:6px 0 5px;font-weight:600}
+.why__card .p{font-size:11.5px;color:var(--muted);line-height:1.55}
+.endpoints{margin-top:18px;border:1px solid var(--line)}
+.ep{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:12px}
+.ep:last-child{border-bottom:0}
+.ep .m{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--accent);border:1px solid rgba(255,106,26,.4);padding:2px 6px;justify-self:start;min-width:46px;text-align:center}
+.ep .m.post{color:var(--accent-soft)}
+.ep .p{color:var(--muted)}
+.ep .p b{color:var(--ink)}
+.repo-link{display:inline-flex;align-items:center;gap:10px;margin-top:6px;padding:12px 16px;border:1px solid var(--accent);color:var(--ink);text-decoration:none;font-size:13px;letter-spacing:.04em;transition:.15s}
+.repo-link:hover{background:rgba(255,106,26,.12)}
+.repo-link b{color:var(--accent)}
+
+/* ---------- architecture diagram ---------- */
+.topo{display:flex;align-items:stretch;gap:0;margin:6px 0 4px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:8px}
+.node{flex:0 0 auto;min-width:104px;border:1px solid var(--line);background:rgba(0,0,0,.3);
+  padding:12px 12px;text-align:center;display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center}
+.node.store{border-color:rgba(255,106,26,.5);background:rgba(255,106,26,.06)}
+.node .ic{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.node .nm{font-family:"Space Grotesk";font-size:12.5px;color:var(--ink);font-weight:600}
+.node .sub{font-size:9.5px;color:var(--faint)}
+.node.store .nm{color:var(--accent)}
+.stores{display:flex;flex-direction:column;gap:8px;flex:0 0 auto}
+.conn{flex:0 0 26px;align-self:center;height:2px;background:linear-gradient(90deg,var(--line),var(--line));position:relative;overflow:visible}
+.conn .pulse{position:absolute;top:50%;left:0;width:5px;height:5px;border-radius:50%;background:var(--accent);
+  transform:translateY(-50%);box-shadow:0 0 8px 1px rgba(255,106,26,.8);animation:flow 1.8s linear infinite}
+@keyframes flow{0%{left:-6%;opacity:0}15%{opacity:1}85%{opacity:1}100%{left:106%;opacity:0}}
+.topo-note{font-size:10.5px;color:var(--faint);letter-spacing:.06em;margin-top:10px}
+
+/* ---------- responsive ---------- */
+@media (max-width:880px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100%}
+  .stage{grid-template-columns:1fr}
+  .panel{min-height:54vh}
+  .head{flex-direction:column;align-items:flex-start}
+  .why{grid-template-columns:1fr}
+  .crow{grid-template-columns:1fr auto;gap:8px}
+  .crow__desc{display:none}
+}
+@media (max-width:520px){
+  .pills{gap:8px}.pill{padding:8px 13px;font-size:11.5px}
+  .pill__ext{display:none}
+  .crow__cat{display:none}.crow{grid-template-columns:1fr}
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .bg__gradient{animation:none}
+  .bg__video{display:none}            /* pause/dim the stream */
+  .frow{animation:none;opacity:1;transform:none}
+  .conn .pulse,.health.live .health__dot{animation:none}
+  *{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== BACKGROUND DATA STREAM ===================== -->
+<div class="bg" aria-hidden="true">
+  <div class="bg__gradient"></div>
+  <!--
+    ███  BACKGROUND VIDEO  ███
+    Replace the src below with your hosted stream URL  →  [VIDEO_URL_HERE]
+    Default points at the uploaded clip so it previews instantly.
+    Keep: muted + loop + playsinline + poster for first paint.
+  -->
+  <video class="bg__video" id="bgVideo"
+         src="uploads/hero-stream.mp4"
+         autoplay muted loop playsinline preload="auto"
+         poster=""></video>
+  <div class="bg__scrim"></div>
+  <div class="bg__grain"></div>
+  <div class="bg__vignette"></div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="head">
+    <div class="brand">
+      <div class="brand__row">
+        <span class="glyph" aria-hidden="true"></span>
+        <span class="wordmark">FEATURE<b>·</b>STORE <span style="color:var(--muted);font-weight:400;font-size:12px">/ mvp</span></span>
+      </div>
+      <div class="tagline">One definition&nbsp; <span class="tick">·</span> &nbsp;<em>Two stores</em>&nbsp; <span class="tick">·</span> &nbsp;Zero skew</div>
+    </div>
+    <div class="health offline" id="health" role="status" aria-live="polite" title="API liveness — polls GET /health">
+      <span class="health__dot"></span>
+      <span class="health__label">API <b id="healthState">CHECKING</b></span>
+      <span class="health__rtt" id="healthRtt"></span>
+    </div>
+  </header>
+
+  <!-- BUBBLE PILLS -->
+  <nav class="pills" aria-label="About this project">
+    <button class="pill" data-modal="about"><span class="pill__n">01</span> About</button>
+    <button class="pill" data-modal="how"><span class="pill__n">02</span> How it works</button>
+    <button class="pill" data-modal="arch"><span class="pill__n">03</span> Architecture</button>
+    <button class="pill" data-modal="why"><span class="pill__n">04</span> Why it saves money</button>
+    <button class="pill" data-modal="source"><span class="pill__n">05</span> API</button>
+    <a class="pill" href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener"><span class="pill__n">06</span> Source <span class="pill__ext">↗</span></a>
+  </nav>
+
+  <!-- MAIN STAGE -->
+  <main class="stage">
+
+    <!-- (a) LIVE LOOKUP -->
+    <section class="panel" aria-labelledby="lk-title">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__idx">01</span>
+          <h2 id="lk-title">LIVE&nbsp;LOOKUP</h2>
+        </div>
+        <span class="panel__hint">Redis-first · PG fallback</span>
+      </div>
+      <div class="panel__body">
+        <form class="lookup__bar" id="lookupForm">
+          <div class="field">
+            <label for="uid">User ID</label>
+            <div class="inp"><span class="gt">›</span><input id="uid" inputmode="numeric" value="12345" autocomplete="off" aria-label="User ID to look up"></div>
+          </div>
+          <button class="run" id="runBtn" type="submit">
+            <span class="run__spin"></span><span class="run__txt">Run</span>
+          </button>
+        </form>
+
+        <div class="req">
+          <span class="method">GET</span>
+          <span class="req__path"><b id="reqUid">/features/online/12345</b> &nbsp;→&nbsp; serve precomputed features</span>
+        </div>
+
+        <div class="meta-row" id="metaRow" hidden>
+          <div class="stat"><div class="stat__k">Latency</div><div class="stat__v"><span id="statMs">—</span><small>ms</small></div></div>
+          <div class="stat"><div class="stat__k">Source</div><div class="stat__v"><span id="statSrc">—</span></div></div>
+          <div class="stat"><div class="stat__k">Features</div><div class="stat__v"><span id="statN">—</span></div></div>
+          <span class="badge-fallback" id="fbBadge" hidden>sample · API offline</span>
+        </div>
+
+        <div class="rows" id="rows">
+          <div class="empty" id="emptyState">
+            Press <span>&nbsp;Run&nbsp;</span> to pull a user's live feature vector from the online store.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- (b) FEATURE CATALOG -->
+    <section class="panel" aria-labelledby="cat-title">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__idx">02</span>
+          <h2 id="cat-title">FEATURE&nbsp;CATALOG</h2>
+        </div>
+        <span class="panel__hint">23 features · 6 categories</span>
+      </div>
+      <div class="panel__body">
+        <div class="tabs" role="tablist" aria-label="Filter features by category" id="tabs"></div>
+        <div class="cat__list" id="catList" role="tabpanel"></div>
+        <div class="cat__foot">
+          <span id="catCount">23 features</span>
+          <span>registry · GET /features/metadata</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="foot">
+    <span>Built by <strong style="color:var(--ink);font-weight:600">Nehemiah</strong> &nbsp;·&nbsp; <a href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener">github.com/ne-he/Feature_shopz</a></span>
+    <span class="foot__skew">// zero train-serve skew</span>
+  </footer>
+</div>
+
+<!-- ===================== MODAL LAYER ===================== -->
+<div class="scrim" id="scrim" role="presentation">
+
+  <!-- ABOUT -->
+  <div class="modal" id="m-about" role="dialog" aria-modal="true" aria-labelledby="about-h">
+    <div class="modal__head">
+      <div><div class="modal__ey">01 / What this is</div><h2 id="about-h">A bridge between raw data and ML models</h2></div>
+      <button class="x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body">
+      <p>A feature store computes user features <strong>once</strong> and serves them two ways: in bulk to <span class="hot">TRAIN</span> models (offline, PostgreSQL) and one-at-a-time to make <span class="hot">real-time predictions</span> (online, Redis).</p>
+      <p>Same definition on both sides — so a model never sees different numbers in training vs production. That bug is called <strong>train/serve skew</strong>, and this kills it.</p>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="modal" id="m-how" role="dialog" aria-modal="true" aria-labelledby="how-h">
+    <div class="modal__head">
+      <div><div class="modal__ey">02 / Pipeline</div><h2 id="how-h">How it works</h2></div>
+      <button class="x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body">
+      <ol class="steps">
+        <li><span class="num">→</span><span><b>Raw CSV</b><span class="d">Source event &amp; transaction data lands as files.</span></span></li>
+        <li><span class="num">→</span><span><b>Ingestion</b><span class="d">Validate, clean, normalize the raw inputs.</span></span></li>
+        <li><span class="num">→</span><span><b>Feature pipeline</b><span class="d">Computes all 23 features in batch.</span></span></li>
+        <li><span class="num">→</span><span><b>Dual write, kept in sync</b><span class="d">PostgreSQL for training · Redis for serving.</span></span></li>
+        <li><span class="num">→</span><span><b>FastAPI REST</b><span class="d">Serves features over five endpoints.</span></span></li>
+        <li><span class="num">→</span><span><b>ML models consume</b><span class="d">A daily scheduled job refreshes everything.</span></span></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div class="modal" id="m-arch" role="dialog" aria-modal="true" aria-labelledby="arch-h">
+    <div class="modal__head">
+      <div><div class="modal__ey">03 / Topology</div><h2 id="arch-h">Architecture</h2></div>
+      <button class="x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="topo">
+        <div class="node"><span class="ic">file</span><span class="nm">CSV</span><span class="sub">raw data</span></div>
+        <div class="conn"><span class="pulse" style="animation-delay:0s"></span></div>
+        <div class="node"><span class="ic">step</span><span class="nm">Ingestion</span><span class="sub">clean</span></div>
+        <div class="conn"><span class="pulse" style="animation-delay:.3s"></span></div>
+        <div class="node"><span class="ic">step</span><span class="nm">Feature&nbsp;Pipeline</span><span class="sub">23 features</span></div>
+        <div class="conn"><span class="pulse" style="animation-delay:.6s"></span></div>
+        <div class="stores">
+          <div class="node store"><span class="ic">offline</span><span class="nm">PostgreSQL</span><span class="sub">training</span></div>
+          <div class="node store"><span class="ic">online</span><span class="nm">Redis</span><span class="sub">serving</span></div>
+        </div>
+        <div class="conn"><span class="pulse" style="animation-delay:.9s"></span></div>
+        <div class="node"><span class="ic">api</span><span class="nm">FastAPI&nbsp;REST</span><span class="sub">5 endpoints</span></div>
+        <div class="conn"><span class="pulse" style="animation-delay:1.2s"></span></div>
+        <div class="node"><span class="ic">consume</span><span class="nm">ML&nbsp;Models</span><span class="sub">predict</span></div>
+      </div>
+      <p class="topo-note">Connectors pulse with the stream — one definition fans out to both stores, then serves over REST.</p>
+    </div>
+  </div>
+
+  <!-- WHY -->
+  <div class="modal" id="m-why" role="dialog" aria-modal="true" aria-labelledby="why-h">
+    <div class="modal__head">
+      <div><div class="modal__ey">04 / Economics</div><h2 id="why-h">Why it saves money</h2></div>
+      <button class="x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="why">
+        <div class="why__card"><div class="n">01</div><div class="h">Compute once, reuse everywhere</div><div class="p">Features are computed a single time and reused across every model and team — no duplicated feature engineering.</div></div>
+        <div class="why__card"><div class="n">02</div><div class="h">Kills train/serve skew</div><div class="p">Eliminates the silent bug that ships wrong predictions and costs hours of debugging.</div></div>
+        <div class="why__card"><div class="n">03</div><div class="h">Millisecond serving</div><div class="p">Redis serves precomputed features in milliseconds — no expensive recompute per request.</div></div>
+        <div class="why__card"><div class="n">04</div><div class="h">Predictable batch cost</div><div class="p">Daily batch precompute means predictable, low compute cost vs on-demand recomputation.</div></div>
+        <div class="why__card" style="grid-column:1/-1"><div class="n">05</div><div class="h">One source of truth</div><div class="p">Faster iteration — and in ML, the real cost is engineer time.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE -->
+  <div class="modal" id="m-source" role="dialog" aria-modal="true" aria-labelledby="src-h">
+    <div class="modal__head">
+      <div><div class="modal__ey">05 / Repository</div><h2 id="src-h">Source &amp; API</h2></div>
+      <button class="x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body">
+      <p>Five REST endpoints expose the stores. The page below calls them live, with a graceful sample fallback when the API is offline.</p>
+      <div class="endpoints">
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/health</b> — liveness, returns store status</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/online/{user_id}</b> — Redis-first, PostgreSQL fallback (real-time)</span></div>
+        <div class="ep"><span class="m post">POST</span><span class="p"><b>/features/batch</b> — up to 100 users from the online store</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/offline/{user_id}</b> — PostgreSQL only (training lookups)</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/metadata</b> — the 23-feature catalog from the registry</span></div>
+      </div>
+      <a class="repo-link" href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener">→ &nbsp;github.com/ne-he/<b>Feature_shopz</b> &nbsp;↗</a>
+      <p style="font-size:11px;color:var(--faint);margin-top:16px">&lt;100ms p99 — design target, measured in-process, not a production benchmark.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA — the 23-feature registry (mirrors /features/metadata)
+   ============================================================ */
+const CATEGORIES = ["All","RFM","Behavioral","Engagement","Temporal","Discount","Demographics"];
+const FEATURES = [
+  {name:"recency_days",cat:"RFM",type:"int",desc:"Days since the user's most recent purchase",val:7},
+  {name:"frequency_count",cat:"RFM",type:"int",desc:"Total number of purchase transactions",val:42},
+  {name:"monetary_total",cat:"RFM",type:"float",desc:"Sum of all transaction amounts (lifetime spend)",val:3847.50},
+  {name:"monetary_avg_per_purchase",cat:"RFM",type:"float",desc:"Average order value per transaction",val:91.61},
+  {name:"monetary_max",cat:"RFM",type:"float",desc:"Largest single transaction amount",val:419.00},
+  {name:"preferred_category",cat:"Behavioral",type:"str",desc:"Most frequently purchased product category",val:"electronics"},
+  {name:"preferred_device",cat:"Behavioral",type:"str",desc:"Most frequently used device",val:"mobile"},
+  {name:"preferred_referral",cat:"Behavioral",type:"str",desc:"Most common referral / traffic source",val:"organic_search"},
+  {name:"category_diversity_count",cat:"Behavioral",type:"int",desc:"Number of distinct categories purchased",val:8},
+  {name:"product_diversity_count",cat:"Behavioral",type:"int",desc:"Number of distinct products purchased",val:37},
+  {name:"avg_session_duration",cat:"Engagement",type:"float",desc:"Average session length in minutes",val:12.4},
+  {name:"avg_review_score",cat:"Engagement",type:"float",desc:"Average review score (1–5) given",val:4.3},
+  {name:"total_reviews_given",cat:"Engagement",type:"int",desc:"Total number of reviews written",val:19},
+  {name:"positive_review_ratio",cat:"Engagement",type:"float",desc:"Fraction of reviews scored ≥ 4",val:0.84},
+  {name:"days_since_signup",cat:"Temporal",type:"int",desc:"Days from signup to most recent purchase",val:612},
+  {name:"is_active_30d",cat:"Temporal",type:"bool",desc:"Whether last login is within 30 days",val:true},
+  {name:"purchase_velocity",cat:"Temporal",type:"float",desc:"Average purchases per active month",val:2.1},
+  {name:"discount_usage_rate",cat:"Discount",type:"float",desc:"Fraction of purchases with a discount",val:0.31},
+  {name:"avg_discount_rate",cat:"Discount",type:"float",desc:"Average discount % on discounted purchases",val:0.15},
+  {name:"total_savings",cat:"Discount",type:"float",desc:"Total savings from discounts",val:184.20},
+  {name:"age",cat:"Demographics",type:"int",desc:"User's age in years",val:34},
+  {name:"country",cat:"Demographics",type:"str",desc:"User's registered country",val:"US"},
+  {name:"gender",cat:"Demographics",type:"str",desc:"User's self-reported gender",val:"F"},
+];
+const CAT_ORDER = ["RFM","Behavioral","Engagement","Temporal","Discount","Demographics"];
+
+/* ============================================================
+   API base resolution
+   ============================================================ */
+const API = (location.protocol === "http:" || location.protocol === "https:") ? "" : "http://localhost:8000";
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- helpers ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+function fmt(v,type){
+  if(type==="bool") return v ? "true" : "false";
+  if(type==="str")  return String(v);
+  if(type==="float"){ const n=Number(v); return Number.isInteger(n)?n.toFixed(2):String(n); }
+  return String(v);
+}
+
+/* ============================================================
+   FEATURE CATALOG — tabs + filterable datasheet
+   ============================================================ */
+let activeCat = "All";
+function renderTabs(){
+  const tabs = $("#tabs");
+  tabs.innerHTML = CATEGORIES.map(c=>{
+    const n = c==="All" ? FEATURES.length : FEATURES.filter(f=>f.cat===c).length;
+    return `<button class="tab" role="tab" data-cat="${c}" aria-selected="${c===activeCat}">${c}<span class="cnt">${n}</span></button>`;
+  }).join("");
+  tabs.onclick = e=>{
+    const b = e.target.closest(".tab"); if(!b) return;
+    activeCat = b.dataset.cat;
+    renderTabs(); renderCatalog();
+  };
+}
+function renderCatalog(){
+  const list = $("#catList");
+  const items = FEATURES.filter(f=> activeCat==="All" || f.cat===activeCat);
+  list.innerHTML = items.map(f=>`
+    <div class="crow">
+      <span class="crow__name">${f.name}</span>
+      <span class="crow__cat">${f.cat}</span>
+      <span class="crow__desc">${f.desc}</span>
+    </div>`).join("");
+  $("#catCount").textContent = `${items.length} feature${items.length!==1?"s":""}` + (activeCat!=="All"?` · ${activeCat}`:"");
+  list.scrollTop = 0;
+}
+
+/* ============================================================
+   LIVE LOOKUP — fetch online features, stream rows in
+   ============================================================ */
+function sampleResponse(uid){
+  const features = {};
+  FEATURES.forEach(f=> features[f.name] = f.val);
+  return { user_id:uid, source:"redis", latency_ms:18, features, _fallback:true };
+}
+
+async function fetchOnline(uid){
+  const t0 = performance.now();
+  try{
+    const ctl = new AbortController();
+    const to = setTimeout(()=>ctl.abort(), 3500);
+    const res = await fetch(`${API}/features/online/${encodeURIComponent(uid)}`, {signal:ctl.signal});
+    clearTimeout(to);
+    // real 404 = user genuinely absent; show a "not found" state, not fake sample data
+    if(res.status === 404) return { user_id:uid, _notfound:true };
+    if(!res.ok) throw new Error("status "+res.status);
+    const data = await res.json();
+    const rtt = Math.round(performance.now()-t0);
+    // schema: { user_id, features:{...}, metadata:{ computed_at, feature_version, source } }
+    const features = data.features || data;
+    const source = (data.metadata && data.metadata.source) || data.source || "redis";
+    // true server-side time from the X-Process-Time-Ms header (CORS-exposed); else client rtt
+    const hdr = res.headers.get("X-Process-Time-Ms");
+    const latency = hdr != null ? Math.round(parseFloat(hdr)) : (data.latency_ms != null ? data.latency_ms : rtt);
+    return { user_id:uid, source, latency_ms:latency, features, _fallback:false };
+  }catch(err){
+    // network/timeout/5xx only — graceful sample so the page still demos offline
+    await new Promise(r=>setTimeout(r, 320)); // tiny beat so it still feels like a request
+    return sampleResponse(uid);
+  }
+}
+
+function pairFeatures(features){
+  // order by catalog, fall back to any extra keys the API returns
+  const ordered = [];
+  const seen = new Set();
+  FEATURES.forEach(f=>{ if(f.name in features){ ordered.push({...f, val:features[f.name]}); seen.add(f.name); }});
+  Object.keys(features).forEach(k=>{ if(!seen.has(k)) ordered.push({name:k,cat:"—",type:typeof features[k]==="number"?"float":(typeof features[k]==="boolean"?"bool":"str"),desc:"",val:features[k]}); });
+  return ordered;
+}
+
+async function runLookup(uid){
+  const btn = $("#runBtn"), rows = $("#rows"), metaRow = $("#metaRow");
+  btn.classList.add("busy"); btn.disabled = true; $(".run__txt",btn).textContent="…";
+  $("#reqUid").textContent = `/features/online/${uid}`;
+
+  const data = await fetchOnline(uid);
+
+  // genuine 404 — no such user in the online store
+  if(data._notfound){
+    metaRow.hidden = true;
+    rows.innerHTML = `<div class="empty">No features for user <span>&nbsp;${uid}&nbsp;</span> in the online store.<br>Try <span>&nbsp;12345&nbsp;</span>.</div>`;
+    btn.classList.remove("busy"); btn.disabled = false; $(".run__txt",btn).textContent="Run";
+    return;
+  }
+
+  const ordered = pairFeatures(data.features);
+
+  // meta
+  metaRow.hidden = false;
+  $("#statMs").textContent = data.latency_ms;
+  $("#statN").textContent = ordered.length;
+  const srcEl = $("#statSrc");
+  const isRedis = String(data.source).toLowerCase().includes("redis");
+  srcEl.textContent = data.source;
+  srcEl.className = isRedis ? "src-redis" : "src-postgres";
+  $("#fbBadge").hidden = !data._fallback;
+
+  // group by category and stream rows in
+  rows.innerHTML = "";
+  const groups = {};
+  ordered.forEach(f=>{ (groups[f.cat] ||= []).push(f); });
+  const cats = Object.keys(groups).sort((a,b)=>{
+    const ia=CAT_ORDER.indexOf(a), ib=CAT_ORDER.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+
+  let i = 0;
+  const stepMs = reduceMotion ? 0 : 26;
+  cats.forEach(cat=>{
+    const head = document.createElement("div");
+    head.className="rows__cat"; head.textContent = cat;
+    rows.appendChild(head);
+    groups[cat].forEach(f=>{
+      const row = document.createElement("div");
+      row.className="frow";
+      row.style.animationDelay = (i*stepMs)+"ms";
+      const cls = f.type==="str" ? "is-str" : (f.type==="bool" ? "is-bool" : "");
+      row.innerHTML = `
+        <div><div class="frow__name">${f.name}</div><div class="frow__desc">${f.desc||""}</div></div>
+        <div class="frow__val ${cls}">${fmt(f.val,f.type)}</div>`;
+      rows.appendChild(row);
+      i++;
+    });
+  });
+
+  btn.classList.remove("busy"); btn.disabled = false; $(".run__txt",btn).textContent="Run";
+}
+
+$("#lookupForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const uid = ($("#uid").value || "12345").trim();
+  $("#uid").value = uid;
+  runLookup(uid);
+});
+
+/* ============================================================
+   HEALTH BADGE — poll GET /health
+   ============================================================ */
+const healthEl = $("#health"), healthState = $("#healthState"), healthRtt = $("#healthRtt");
+function setHealth(state, rtt){
+  healthEl.classList.remove("live","degraded","offline");
+  healthEl.classList.add(state);
+  healthState.textContent = state==="live" ? "LIVE" : state==="degraded" ? "DEGRADED" : "OFFLINE";
+  healthRtt.textContent = rtt!=null ? `· ${rtt}ms` : "";
+}
+async function pollHealth(){
+  const t0 = performance.now();
+  try{
+    const ctl = new AbortController();
+    const to = setTimeout(()=>ctl.abort(), 2500);
+    const res = await fetch(`${API}/health`, {signal:ctl.signal});
+    clearTimeout(to);
+    const rtt = Math.round(performance.now()-t0);
+    let body={}; try{ body = await res.json(); }catch(_){}
+    // real schema: { status:"healthy"|"unhealthy", checks:{ postgres, redis } }
+    if(body.status === "healthy"){
+      setHealth("live", rtt);
+    } else if(body.status === "unhealthy" || res.status === 503){
+      setHealth("degraded", rtt);   // one store unreachable, API still answering
+    } else if(!res.ok){
+      throw new Error();
+    } else {
+      setHealth("live", rtt);
+    }
+  }catch(_){
+    setHealth("offline", null);
+  }
+}
+
+/* ============================================================
+   MODALS — accessible: focus trap-ish, ESC, click-out, aria
+   ============================================================ */
+const scrim = $("#scrim");
+let lastFocus = null;
+function openModal(id){
+  lastFocus = document.activeElement;
+  const m = $("#m-"+id); if(!m) return;
+  scrim.classList.add("open");
+  $$(".modal",scrim).forEach(x=>x.classList.remove("open"));
+  m.classList.add("open");
+  const f = m.querySelector(".x"); f && f.focus();
+}
+function closeModal(){
+  scrim.classList.remove("open");
+  $$(".modal",scrim).forEach(x=>x.classList.remove("open"));
+  lastFocus && lastFocus.focus && lastFocus.focus();
+}
+$$(".pill[data-modal]").forEach(p=> p.addEventListener("click", ()=> openModal(p.dataset.modal)) );
+$$("[data-close]").forEach(b=> b.addEventListener("click", closeModal));
+scrim.addEventListener("click", e=>{ if(e.target===scrim) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && scrim.classList.contains("open")) closeModal(); });
+// keep focus inside the open modal
+scrim.addEventListener("keydown", e=>{
+  if(e.key!=="Tab") return;
+  const m = $(".modal.open",scrim); if(!m) return;
+  const f = $$('button, a[href], input, [tabindex]:not([tabindex="-1"])', m);
+  if(!f.length) return;
+  const first=f[0], last=f[f.length-1];
+  if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+});
+
+/* ============================================================
+   BACKGROUND VIDEO — reveal when it can paint; honor reduced motion
+   ============================================================ */
+const bgVideo = $("#bgVideo");
+if(reduceMotion){
+  try{ bgVideo.pause(); }catch(_){}
+  bgVideo.removeAttribute("autoplay");
+}else{
+  bgVideo.addEventListener("loadeddata", ()=> bgVideo.classList.add("ready"));
+  bgVideo.addEventListener("error", ()=> bgVideo.classList.remove("ready")); // gradient stays
+  // some browsers need an explicit play kick
+  const tryPlay = ()=> bgVideo.play().catch(()=>{});
+  tryPlay();
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+renderTabs();
+renderCatalog();
+pollHealth();
+setInterval(pollHealth, 8000);
+// auto-run the hero lookup shortly after load so the stage is alive
+setTimeout(()=> runLookup($("#uid").value.trim() || "12345"), 650);
+</script>
+</body>
+</html>

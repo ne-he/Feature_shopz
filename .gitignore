@@ -71,3 +71,8 @@ PRD.md
 frontend/mlev1/uploads/
 frontend/mlev1/.thumbnail
 frontend/mlev1/archive/
+frontend/MLv2/.thumbnail
+
+# MLv2 background video IS served as a static asset (Option A: ships with the app),
+# so it must be tracked despite the global *.mp4 ignore above. Compress it first.
+!frontend/MLv2/uploads/hero-stream.mp4

@@ -51,7 +51,7 @@ _CORS_ORIGINS: list[str] = ["*"]
 
 # Static showcase frontend (Claude design). Served at "/" when present so a
 # single `uvicorn` command serves both the page and the API on one origin.
-_FRONTEND_DIR: Path = Path(__file__).parents[2] / "frontend" / "mlev1"
+_FRONTEND_DIR: Path = Path(__file__).parents[2] / "frontend" / "MLv2"
 
 
 @asynccontextmanager
