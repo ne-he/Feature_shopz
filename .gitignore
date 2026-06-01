@@ -65,4 +65,9 @@ PRD.md
 *.mp4
 *.mov
 *.avi
-frontend/
+
+# The frontend showcase IS tracked (index.html + poster + screenshots), but
+# heavy video and scratch/dev artifacts under it are not.
+frontend/mlev1/uploads/
+frontend/mlev1/.thumbnail
+frontend/mlev1/archive/

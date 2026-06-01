@@ -110,8 +110,23 @@ Both services define healthchecks, use named Docker volumes
 
 > On Windows, invoke the project venv directly: `.\.venv\Scripts\python.exe -m <cmd>`.
 
+### Zero-infra demo (no Docker)
+
+The fastest way to see the whole thing — API **and** the showcase frontend —
+running live without PostgreSQL or Redis:
+
 ```bash
-# Serving API (M3) — Swagger UI at http://localhost:8000/docs
+python scripts/demo_server.py     # seeds in-memory stores, serves http://localhost:8000
+```
+
+Open <http://localhost:8000>: the landing page calls the real API for the
+feature catalog, a live single-user lookup (try user `12345`), and the health
+badge. Every endpoint row is clickable to run it against the response panel.
+
+### Full stack (real PostgreSQL + Redis)
+
+```bash
+# Serving API (M3) — Swagger UI at http://localhost:8000/docs, frontend at /
 uvicorn src.api.main:app --reload
 
 # Monitoring dashboard (M4) — opens at http://localhost:8501

@@ -16,10 +16,13 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from redis.exceptions import RedisError
 from sqlalchemy import create_engine
@@ -41,6 +44,14 @@ from src.features import (  # noqa: F401 -- imported to populate REGISTRY on loa
 from src.storage.online_store import get_redis_client
 
 PROCESS_TIME_HEADER: str = "X-Process-Time-Ms"
+
+# Permissive CORS for local MVP so the static frontend can call the API from
+# file:// or a different port. Tighten to explicit origins for any real deploy.
+_CORS_ORIGINS: list[str] = ["*"]
+
+# Static showcase frontend (Claude design). Served at "/" when present so a
+# single `uvicorn` command serves both the page and the API on one origin.
+_FRONTEND_DIR: Path = Path(__file__).parents[2] / "frontend" / "mlev1"
 
 
 @asynccontextmanager
@@ -110,21 +121,43 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
 
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve the static showcase frontend at "/" when the directory exists.
+
+    Mounted last so the API routes (and /docs) registered earlier always win;
+    only unmatched paths fall through to the static files.
+    """
+    if _FRONTEND_DIR.is_dir():
+        app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
+        logger.info("Serving frontend from {}", _FRONTEND_DIR)
+    else:
+        logger.warning("Frontend dir not found; static mount skipped: {}", _FRONTEND_DIR)
+
+
 def create_app() -> FastAPI:
     """Construct and configure the FastAPI application.
 
     Returns:
-        A FastAPI app with routers, middleware, and exception handlers wired.
+        A FastAPI app with CORS, routers, middleware, exception handlers, and
+        the static frontend mount wired.
     """
     app = FastAPI(
         title="Feature Store MVP API",
         version=API_VERSION,
         lifespan=lifespan,
     )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_CORS_ORIGINS,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+        expose_headers=[PROCESS_TIME_HEADER],
+    )
     _register_middleware(app)
     _register_exception_handlers(app)
     app.include_router(health.router)
     app.include_router(features.router)
+    _mount_frontend(app)
     return app
 
 
