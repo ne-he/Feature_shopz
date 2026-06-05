@@ -1,0 +1,58 @@
+# Docker Compose for feature-store-mvp local development.
+# Starts PostgreSQL 15 (offline store) + Redis 7 (online store).
+#
+# Usage:
+#   make up      — start services in background
+#   make down    — stop and remove containers
+#
+# Credentials come from .env (copy .env.example → .env before first run).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: feature_store_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-feature_store}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-feature_store}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-feature_store} -d ${POSTGRES_DB:-feature_store}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - feature_store_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: feature_store_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - feature_store_net
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  feature_store_net:
+    driver: bridge
