@@ -4,7 +4,7 @@ Reads environment variables from .env using Pydantic Settings. All modules
 import the module-level `settings` singleton rather than constructing their own.
 """
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     redis_host: str = Field(default="localhost")
     redis_port: int = Field(default=6379)
 
+    # Full-URL overrides. Managed hosts (e.g. Render) expose a single
+    # connection string rather than discrete components. When set, these take
+    # precedence over the host/port fields above; unset (the default) keeps the
+    # local component-based behavior unchanged.
+    database_url: str | None = Field(default=None)
+    redis_dsn: str | None = Field(
+        default=None, validation_alias=AliasChoices("REDIS_URL", "redis_dsn")
+    )
+
     # Logging
     log_level: str = Field(default="INFO")
 
@@ -37,7 +46,18 @@ class Settings(BaseSettings):
 
     @property
     def postgres_url(self) -> str:
-        """Construct the synchronous SQLAlchemy / psycopg2 database URL."""
+        """Construct the synchronous SQLAlchemy / psycopg2 database URL.
+
+        When ``database_url`` is set (e.g. Render's connection string), it is
+        used directly with the scheme normalised to the psycopg2 driver;
+        otherwise the URL is built from the discrete components.
+        """
+        if self.database_url:
+            url = self.database_url
+            for prefix in ("postgresql+psycopg2://", "postgresql://", "postgres://"):
+                if url.startswith(prefix):
+                    return "postgresql+psycopg2://" + url[len(prefix) :]
+            return url
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -45,7 +65,14 @@ class Settings(BaseSettings):
 
     @property
     def redis_url(self) -> str:
-        """Construct the Redis connection URL (database 0)."""
+        """Construct the Redis connection URL (database 0).
+
+        Uses ``redis_dsn`` (env ``REDIS_URL``) verbatim when set — supporting
+        managed stores that require auth/TLS (``rediss://``) — otherwise builds
+        the URL from host + port.
+        """
+        if self.redis_dsn:
+            return self.redis_dsn
         return f"redis://{self.redis_host}:{self.redis_port}/0"
 
 

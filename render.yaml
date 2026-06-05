@@ -1,0 +1,50 @@
+# Render Blueprint — Feature Store MVP (public deploy: API + MLv2 frontend).
+#
+# Provisions three free resources in one region:
+#   - a Docker web service (FastAPI; also serves the showcase frontend at "/")
+#   - a managed PostgreSQL 15 instance (offline store)
+#   - a managed Key Value / Redis instance (online store, internal-only)
+#
+# The web service reads DATABASE_URL + REDIS_URL (see src/config.py), which are
+# wired below from the managed resources' connection strings.
+#
+# After the first deploy, seed the cloud stores — see docs/deploy_render.md.
+# Blueprint spec: https://render.com/docs/blueprint-spec
+
+services:
+  # FastAPI app (serves the MLv2 showcase frontend at "/" as well).
+  - type: web
+    name: feature-store-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: feature-store-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: feature-store-cache
+          property: connectionString
+      - key: LOG_LEVEL
+        value: INFO
+
+  # Managed Redis-compatible online store. Internal access only — the web
+  # service connects over Render's private network; nothing is exposed publicly.
+  - type: keyvalue
+    name: feature-store-cache
+    plan: free
+    region: oregon
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: feature-store-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "15"

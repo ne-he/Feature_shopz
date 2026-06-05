@@ -1,0 +1,52 @@
+# Keep the build context small and secrets out of the image.
+
+# VCS + CI
+.git/
+.github/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+
+# Test / type / lint caches + coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Not needed at runtime (the Dockerfile copies only what it needs anyway)
+tests/
+notebooks/
+scripts/
+docs/
+backups_dataset/
+
+# Datasets are never shipped in the image — seed the cloud DB from your laptop
+data/
+ecommerce_synthetic_dataset.csv
+
+# Secrets
+.env
+.env.*
+
+# Old frontend version + loose heavy media (only frontend/MLv2 is served)
+frontend/mlev1/
+frontend/*.mp4
+
+# Local-only project docs
+CLAUDE.md
+PRD.md
