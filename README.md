@@ -1,3 +1,14 @@
+---
+title: Feature Store MVP
+emoji: ⚡
+colorFrom: orange
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Low-latency e-commerce ML feature store — live demo
+---
+
 # Feature Store MVP
 
 > Production-grade feature store for e-commerce ML serving.

@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -98,8 +99,12 @@ def main() -> None:
     seeded = _seed(engine, redis_client)
     app.dependency_overrides[get_engine] = lambda: engine
     app.dependency_overrides[get_redis] = lambda: redis_client
-    logger.success("Seeded {} demo users — serving on http://localhost:8000", seeded)
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "8000"))
+    logger.success(
+        "Seeded {} demo users — serving on http://{}:{}", seeded, host, port
+    )
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":
