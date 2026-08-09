@@ -25,6 +25,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.api.dependencies import get_engine, get_redis
 from src.api.main import create_app
+from src.api.schemas import MAX_USER_ID
 from src.storage.models import Base, UserFeatures
 from src.storage.online_store import set_user_features
 
@@ -157,6 +158,24 @@ class TestOnlineFeatures:
         resp = client.get("/features/online/1")
         assert "X-Process-Time-Ms" in resp.headers
 
+    def test_online_oversized_user_id_returns_422(self, client: TestClient) -> None:
+        """An id past the INT32 column bound is rejected, not passed to the store.
+
+        Regression: the oversized value used to reach the offline-store query and
+        raise OverflowError from the driver, which escaped the SQLAlchemyError
+        handler and surfaced as a 500.
+        """
+        resp = client.get(f"/features/online/{MAX_USER_ID + 1}")
+        assert resp.status_code == 422
+
+    def test_online_zero_user_id_returns_422(self, client: TestClient) -> None:
+        """User ids are positive; 0 is rejected at the boundary."""
+        assert client.get("/features/online/0").status_code == 422
+
+    def test_online_non_numeric_user_id_returns_422(self, client: TestClient) -> None:
+        """A non-numeric id is a validation error, not a store or server error."""
+        assert client.get("/features/online/abc").status_code == 422
+
 
 class TestOfflineFeatures:
     """Tests for GET /features/offline/{user_id}."""
@@ -173,6 +192,11 @@ class TestOfflineFeatures:
     def test_offline_unknown_user_returns_404(self, client: TestClient) -> None:
         """An absent offline row -> 404."""
         assert client.get("/features/offline/99").status_code == 404
+
+    def test_offline_oversized_user_id_returns_422(self, client: TestClient) -> None:
+        """The offline lookup shares the same id bound as the online one."""
+        resp = client.get(f"/features/offline/{MAX_USER_ID + 1}")
+        assert resp.status_code == 422
 
 
 class TestBatchFeatures:
@@ -207,6 +231,11 @@ class TestBatchFeatures:
     def test_batch_empty_user_ids_returns_422(self, client: TestClient) -> None:
         """An empty user_ids list -> 422 validation error."""
         assert client.post("/features/batch", json={"user_ids": []}).status_code == 422
+
+    def test_batch_oversized_user_id_returns_422(self, client: TestClient) -> None:
+        """Each element carries the same id bound as the path parameter."""
+        resp = client.post("/features/batch", json={"user_ids": [1, MAX_USER_ID + 1]})
+        assert resp.status_code == 422
 
 
 class TestFeatureMetadata:

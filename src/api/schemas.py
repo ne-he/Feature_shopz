@@ -9,12 +9,24 @@ storage-layer representations so the API surface can evolve independently.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 MAX_BATCH_USERS: int = 100
 """Maximum number of user_ids accepted in a single batch request (PRD § 3)."""
+
+MAX_USER_ID: int = 2_147_483_647
+"""Largest accepted user_id, mirroring the INT32 ``user_features.user_id`` column.
+
+Enforced at the API boundary so an out-of-range id is rejected as a 422 before
+it reaches the offline store. Without this the driver raises on the oversized
+bind parameter (OverflowError on SQLite, a range DataError on PostgreSQL), which
+surfaces to the caller as a 500/503 rather than as the input error it is.
+"""
+
+UserId = Annotated[int, Field(ge=1, le=MAX_USER_ID)]
+"""A user identifier constrained to the range the offline store can hold."""
 
 FeatureSource = Literal["redis", "postgres"]
 
@@ -41,7 +53,7 @@ class BatchFeatureRequest(BaseModel):
     ``user_ids`` is capped at MAX_BATCH_USERS; exceeding it yields a 422.
     """
 
-    user_ids: list[int] = Field(min_length=1, max_length=MAX_BATCH_USERS)
+    user_ids: list[UserId] = Field(min_length=1, max_length=MAX_BATCH_USERS)
     feature_list: list[str] | None = None
 
 
