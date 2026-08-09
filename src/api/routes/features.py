@@ -12,11 +12,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.api.dependencies import EngineDep, RedisDep
 from src.api.schemas import (
+    MAX_USER_ID,
     BatchFeatureRequest,
     BatchFeatureResponse,
     BatchMetadata,
@@ -32,6 +33,10 @@ from src.storage.offline_store import get_last_computed_at, read_user_features
 from src.storage.online_store import get_user_features
 
 router = APIRouter(prefix="/features", tags=["features"])
+
+# Path-parameter constraint shared by the two single-user lookups. Keeping the
+# bound at the boundary means an unusable id is a 422, never a store error.
+_UserIdPath = Path(ge=1, le=MAX_USER_ID, description="User identifier")
 
 # Stored records carry these alongside feature values; they are surfaced as
 # response metadata rather than as features.
@@ -132,15 +137,15 @@ def get_feature_metadata(engine: EngineDep) -> FeatureMetadataResponse:
 
 @router.get("/online/{user_id}", response_model=FeatureResponse)
 def get_online_features(
-    user_id: int,
     engine: EngineDep,
     redis_client: RedisDep,
+    user_id: int = _UserIdPath,
     feature_list: str | None = Query(default=None),
 ) -> FeatureResponse:
     """Fetch a user's features, Redis-first with a PostgreSQL fallback (M3.5).
 
     Args:
-        user_id: User identifier.
+        user_id: User identifier, 1..MAX_USER_ID.
         engine: Injected SQLAlchemy engine (fallback source).
         redis_client: Injected Redis client (primary source).
         feature_list: Optional comma-separated names to restrict the result.
@@ -173,13 +178,13 @@ def get_online_features(
 
 @router.get("/offline/{user_id}", response_model=FeatureResponse)
 def get_offline_features(
-    user_id: int,
     engine: EngineDep,
+    user_id: int = _UserIdPath,
 ) -> FeatureResponse:
     """Fetch a user's features straight from the offline store (M3.7).
 
     Args:
-        user_id: User identifier.
+        user_id: User identifier, 1..MAX_USER_ID.
         engine: Injected SQLAlchemy engine for the offline store.
 
     Returns:
