@@ -543,11 +543,19 @@ const CAT_ORDER = ["RFM","Behavioral","Engagement","Temporal","Discount","Demogr
    API base resolution
    ============================================================ */
 const API = (location.protocol === "http:" || location.protocol === "https:") ? "" : "http://localhost:8000";
+/* Abort windows. Sized for a hosted container, not for localhost: a warm
+   free-tier Space answers in roughly 1s, so the original 2.5s/3.5s budgets
+   left almost no headroom and a visitor on mobile data would see a red
+   "API OFFLINE" badge plus fabricated sample rows while the API was fine. */
+const HEALTH_TIMEOUT_MS = 8000;
+const LOOKUP_TIMEOUT_MS = 10000;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- helpers ---------- */
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const ESCAPES = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+const esc = v => String(v).replace(/[&<>"']/g, c => ESCAPES[c]);
 function fmt(v,type){
   if(type==="bool") return v ? "true" : "false";
   if(type==="str")  return String(v);
@@ -597,11 +605,15 @@ async function fetchOnline(uid){
   const t0 = performance.now();
   try{
     const ctl = new AbortController();
-    const to = setTimeout(()=>ctl.abort(), 3500);
+    const to = setTimeout(()=>ctl.abort(), LOOKUP_TIMEOUT_MS);
     const res = await fetch(`${API}/features/online/${encodeURIComponent(uid)}`, {signal:ctl.signal});
     clearTimeout(to);
     // real 404 = user genuinely absent; show a "not found" state, not fake sample data
     if(res.status === 404) return { user_id:uid, _notfound:true };
+    // any other 4xx is a rejected input (e.g. 422 for a non-numeric or
+    // out-of-range id). The API is healthy, so it must not fall through to the
+    // sample-data path, which would label a typo as "API offline".
+    if(res.status >= 400 && res.status < 500) return { user_id:uid, _badinput:true };
     if(!res.ok) throw new Error("status "+res.status);
     const data = await res.json();
     const rtt = Math.round(performance.now()-t0);
@@ -635,10 +647,13 @@ async function runLookup(uid){
 
   const data = await fetchOnline(uid);
 
-  // genuine 404 — no such user in the online store
-  if(data._notfound){
+  // genuine 404 or rejected input: both are answers from a healthy API, so
+  // render an explanation rather than the sample-data stage.
+  if(data._notfound || data._badinput){
     metaRow.hidden = true;
-    rows.innerHTML = `<div class="empty">No features for user <span>&nbsp;${uid}&nbsp;</span> in the online store.<br>Try <span>&nbsp;12345&nbsp;</span>.</div>`;
+    rows.innerHTML = data._badinput
+      ? `<div class="empty">Not a valid user ID.<br>Enter a whole number from <span>&nbsp;1&nbsp;</span> to <span>&nbsp;2147483647&nbsp;</span>.</div>`
+      : `<div class="empty">No features for user <span>&nbsp;${esc(uid)}&nbsp;</span> in the online store.<br>Try <span>&nbsp;12345&nbsp;</span>.</div>`;
     btn.classList.remove("busy"); btn.disabled = false; $(".run__txt",btn).textContent="Run";
     return;
   }
@@ -697,7 +712,11 @@ $("#lookupForm").addEventListener("submit", e=>{
    HEALTH BADGE — poll GET /health
    ============================================================ */
 const healthEl = $("#health"), healthState = $("#healthState"), healthRtt = $("#healthRtt");
+/* Consecutive failed polls. One miss is not an outage: a container waking
+   from idle can blow the first window while being perfectly healthy. */
+let healthMisses = 0;
 function setHealth(state, rtt){
+  if(state !== "offline") healthMisses = 0;
   healthEl.classList.remove("live","degraded","offline");
   healthEl.classList.add(state);
   healthState.textContent = state==="live" ? "LIVE" : state==="degraded" ? "DEGRADED" : "OFFLINE";
@@ -707,7 +726,7 @@ async function pollHealth(){
   const t0 = performance.now();
   try{
     const ctl = new AbortController();
-    const to = setTimeout(()=>ctl.abort(), 2500);
+    const to = setTimeout(()=>ctl.abort(), HEALTH_TIMEOUT_MS);
     const res = await fetch(`${API}/health`, {signal:ctl.signal});
     clearTimeout(to);
     const rtt = Math.round(performance.now()-t0);
@@ -723,7 +742,9 @@ async function pollHealth(){
       setHealth("live", rtt);
     }
   }catch(_){
-    setHealth("offline", null);
+    // Hold the previous state on a single miss; only two in a row is an outage.
+    healthMisses++;
+    if(healthMisses >= 2) setHealth("offline", null);
   }
 }
 
