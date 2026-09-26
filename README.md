@@ -6,7 +6,7 @@ colorTo: yellow
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Low-latency e-commerce ML feature store — live demo
+short_description: Low-latency e-commerce ML feature store, live demo
 ---
 
 # Feature Store MVP
