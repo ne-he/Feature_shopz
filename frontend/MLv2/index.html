@@ -3,7 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Feature Store MVP — One definition. Two stores. Zero skew.</title>
+<title>Feature Store MVP · One definition. Two stores. Zero skew.</title>
+<meta name="description" content="E-commerce ML feature store: 23 user features computed once, stored offline in PostgreSQL for training and online in Redis for serving, exposed over FastAPI." />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Feature Store MVP · One definition. Two stores. Zero skew." />
+<meta property="og:description" content="E-commerce ML feature store: 23 user features computed once, stored offline in PostgreSQL for training and online in Redis for serving, exposed over FastAPI." />
+<meta name="twitter:card" content="summary" />
+<!-- favicon: the header glyph (two offset amber squares) on the page's near-black -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a09'/%3E%3Crect x='5' y='5' width='17' height='17' fill='none' stroke='%23FF6A1A' stroke-width='2' opacity='.45'/%3E%3Crect x='10' y='10' width='17' height='17' fill='%23FF6A1A' fill-opacity='.1' stroke='%23FF6A1A' stroke-width='2'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -265,7 +272,9 @@ button,input{font-family:inherit;color:inherit}
 @media (max-width:880px){
   body{overflow:auto}
   .app{height:auto;min-height:100%}
-  .stage{grid-template-columns:1fr}
+  /* minmax(0,1fr): a bare 1fr track grows to the panel's min-content (the
+     nowrap request path), which pushed the page ~37px wider than a phone */
+  .stage{grid-template-columns:minmax(0,1fr)}
   .panel{min-height:54vh}
   .head{flex-direction:column;align-items:flex-start}
   .why{grid-template-columns:1fr}
