@@ -15,7 +15,14 @@ short_description: Low-latency e-commerce ML feature store — live demo
 > Ingests transaction data, computes 20+ user-level features in batch,
 > serves them via a low-latency REST API, and monitors freshness & drift.
 
-**Status:** ✅ All milestones complete (M1–M4) — ingestion → features → serving API → monitoring.
+**Live demo:** <https://ne-he-feature-store-mvp.hf.space>
+· health check [`/health`](https://ne-he-feature-store-mvp.hf.space/health)
+· API docs (Swagger UI) [`/docs`](https://ne-he-feature-store-mvp.hf.space/docs)
+
+The Space runs the [zero-infra demo](#zero-infra-demo-no-docker): the real FastAPI app and
+frontend over in-memory stores seeded with 201 sample users, no PostgreSQL or Redis behind it.
+
+**Status:** ✅ All milestones complete (M1–M4): ingestion → features → serving API → monitoring.
 
 ---
 
@@ -28,8 +35,8 @@ flowchart TB
     end
 
     subgraph Ingestion["⚙️ Ingestion Layer"]
-        LOAD[loader.py — CSV → DataFrame]
-        CLEAN[cleaner.py — clip, parse, coerce]
+        LOAD[loader.py: CSV → DataFrame]
+        CLEAN[cleaner.py: clip, parse, coerce]
     end
 
     subgraph Compute["🧮 Feature Computation (M2)"]
@@ -43,12 +50,12 @@ flowchart TB
     end
 
     subgraph Serving["🌐 Serving Layer (M3)"]
-        API[FastAPI — /features/online /batch]
+        API[FastAPI: /features/online /batch]
     end
 
     subgraph Monitoring["📊 Monitoring (M4)"]
         DASH[Streamlit Dashboard]
-        DRIFT[Evidently — Drift Detection]
+        DRIFT[Evidently: Drift Detection]
     end
 
     CSV --> LOAD --> CLEAN --> PIPE --> RFM --> PG
@@ -78,7 +85,7 @@ flowchart TB
 
 - Python 3.11 or newer
 - Docker + Docker Compose (for PostgreSQL + Redis)
-- `make` (optional — wraps all common commands)
+- `make` (optional, wraps all common commands)
 
 ## Quick Start
 
@@ -123,7 +130,7 @@ Both services define healthchecks, use named Docker volumes
 
 ### Zero-infra demo (no Docker)
 
-The fastest way to see the whole thing — API **and** the showcase frontend —
+The fastest way to see the whole thing, API **and** the showcase frontend,
 running live without PostgreSQL or Redis:
 
 ```bash
@@ -137,10 +144,10 @@ badge. Every endpoint row is clickable to run it against the response panel.
 ### Full stack (real PostgreSQL + Redis)
 
 ```bash
-# Serving API (M3) — Swagger UI at http://localhost:8000/docs, frontend at /
+# Serving API (M3): Swagger UI at http://localhost:8000/docs, frontend at /
 uvicorn src.api.main:app --reload
 
-# Monitoring dashboard (M4) — opens at http://localhost:8501
+# Monitoring dashboard (M4): opens at http://localhost:8501
 streamlit run src/dashboard/app.py
 
 # One-off feature refresh (compute → offline store → sync to Redis)
@@ -187,14 +194,14 @@ More details: [`data/README.md`](data/README.md).
 
 ```
 src/
-  config.py            Pydantic Settings — reads .env
+  config.py            Pydantic Settings, reads .env
   ingestion/           loader, schema, cleaner
   features/            RFM, behavior, engagement, temporal, discount, demographics (M2)
   storage/             SQLAlchemy models, offline (PG) + online (Redis) stores (M2-M3)
   api/                 FastAPI app + routes (M3)
   orchestration/       APScheduler daily refresh job (M4)
   monitoring/          Freshness, Evidently drift, store metrics (M4)
-  dashboard/           Streamlit app — 4 pages (M4)
+  dashboard/           Streamlit app, 4 pages (M4)
 
 tests/
   conftest.py          Shared fixtures
@@ -260,4 +267,4 @@ alembic revision --autogenerate -m "describe change"
 
 ## License
 
-MIT — see `pyproject.toml`.
+MIT. See `pyproject.toml`.
