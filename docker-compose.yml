@@ -2,8 +2,8 @@
 # Starts PostgreSQL 15 (offline store) + Redis 7 (online store).
 #
 # Usage:
-#   make up      — start services in background
-#   make down    — stop and remove containers
+#   make up: start services in background
+#   make down: stop and remove containers
 #
 # Credentials come from .env (copy .env.example → .env before first run).
 

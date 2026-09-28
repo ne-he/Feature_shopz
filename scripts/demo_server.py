@@ -1,4 +1,4 @@
-"""Run the full app + frontend with seeded in-memory stores — no Docker needed.
+"""Run the full app + frontend with seeded in-memory stores, no Docker needed.
 
 Builds the FastAPI app, points its store dependencies at an in-memory SQLite
 offline store and a fakeredis online store seeded with sample users, then
@@ -98,7 +98,7 @@ def main() -> None:
     seeded = _seed(engine, redis_client)
     app.dependency_overrides[get_engine] = lambda: engine
     app.dependency_overrides[get_redis] = lambda: redis_client
-    logger.success("Seeded {} demo users — serving on http://localhost:8000", seeded)
+    logger.success("Seeded {} demo users, serving on http://localhost:8000", seeded)
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
 
 

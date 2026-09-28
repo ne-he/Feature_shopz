@@ -100,7 +100,7 @@ def render_drift(engine: Engine) -> None:
     st.header("Drift Report")
     baseline = load_baseline()
     if baseline is None:
-        st.info("No baseline saved yet — save one from a known-good run.")
+        st.info("No baseline saved yet, save one from a known-good run.")
         return
     current = load_feature_frame(engine)
     if current.empty:
@@ -115,7 +115,7 @@ def render_drift(engine: Engine) -> None:
 def main() -> None:
     """Entry point: page selection + dispatch."""
     st.set_page_config(page_title="Feature Store Monitor", layout="wide")
-    st.title("📊 Feature Store — Monitoring")
+    st.title("📊 Feature Store, Monitoring")
     engine = _get_engine()
     redis_client = _get_redis()
     page = st.sidebar.radio("Page", ["Overview", "Catalog", "Distributions", "Drift"])
