@@ -1,6 +1,6 @@
 """Feature definition decorator and central registry.
 
-Provides ``@feature_definition`` — a decorator that attaches structured
+Provides ``@feature_definition``: a decorator that attaches structured
 metadata to a feature computation function and registers it in a global
 registry. The registry is the single source of truth for *what* features
 exist, their semantics (data type, valid range, owner), and *how* to
@@ -8,8 +8,8 @@ compute them (PRD § 9).
 
 Feature modules (rfm.py, behavior.py, ...) decorate their compute
 functions; importing those modules populates ``REGISTRY`` as a side
-effect. Downstream consumers — the pipeline (M2.8) and the metadata API
-endpoint (M3) — read from this registry rather than hardcoding names.
+effect. Downstream consumers, the pipeline (M2.8) and the metadata API
+endpoint (M3): read from this registry rather than hardcoding names.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# Hugging Face Spaces — live demo image.
+# Hugging Face Spaces: live demo image.
 #
 # Runs the zero-infra demo server (scripts/demo_server.py): the real FastAPI app
 # + MLv2 frontend, backed by an in-memory SQLite offline store and a fakeredis

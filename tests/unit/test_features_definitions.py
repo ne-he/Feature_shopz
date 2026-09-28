@@ -32,7 +32,7 @@ def _isolate_global_registry() -> Iterator[None]:
 
 
 # ---------------------------------------------------------------------------
-# FeatureDefinition — metadata model
+# FeatureDefinition: metadata model
 # ---------------------------------------------------------------------------
 
 
@@ -75,7 +75,7 @@ class TestFeatureDefinition:
             )
 
     def test_feature_definition_is_immutable(self) -> None:
-        """The model is frozen — attribute assignment raises."""
+        """The model is frozen: attribute assignment raises."""
         definition = FeatureDefinition(
             name="x", description="d", data_type="int", owner="nehemiah"
         )
@@ -84,7 +84,7 @@ class TestFeatureDefinition:
 
 
 # ---------------------------------------------------------------------------
-# FeatureRegistry — container
+# FeatureRegistry: container
 # ---------------------------------------------------------------------------
 
 
@@ -157,7 +157,7 @@ class TestFeatureRegistry:
 
 
 # ---------------------------------------------------------------------------
-# feature_definition — decorator
+# feature_definition: decorator
 # ---------------------------------------------------------------------------
 
 
