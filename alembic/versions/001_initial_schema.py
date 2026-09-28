@@ -1,4 +1,4 @@
-"""Initial database schema — all three feature store tables.
+"""Initial database schema: all three feature store tables.
 
 Revision ID: 001
 Revises:

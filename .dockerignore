@@ -35,7 +35,7 @@ scripts/
 docs/
 backups_dataset/
 
-# Datasets are never shipped in the image — seed the cloud DB from your laptop
+# Datasets are never shipped in the image: seed the cloud DB from your laptop
 data/
 ecommerce_synthetic_dataset.csv
 

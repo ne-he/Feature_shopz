@@ -21,7 +21,7 @@ from redis.exceptions import RedisError
 
 from src.config import settings
 
-DEFAULT_TTL_SECONDS: int = 90_000  # 25 hours — one hour past the daily refresh
+DEFAULT_TTL_SECONDS: int = 90_000  # 25 hours, one hour past the daily refresh
 PIPELINE_CHUNK_SIZE: int = 200
 _KEY_PREFIX: str = "features:user:"
 

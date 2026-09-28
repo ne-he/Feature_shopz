@@ -6,7 +6,7 @@
 # every runtime dependency ships a manylinux wheel, so no compiler or apt
 # packages are required.
 #
-# For simplicity this installs ALL runtime deps — including Streamlit/Evidently,
+# For simplicity this installs ALL runtime deps: including Streamlit/Evidently,
 # which only the dashboard uses. The API process never imports those, so they
 # cost build time + image size but not runtime RAM. To slim the image later,
 # add an `api` optional-dependency group in pyproject.toml and switch the

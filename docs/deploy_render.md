@@ -21,7 +21,7 @@ resources from `render.yaml`:
 (`src/api/routes/features.py`). So:
 
 - Seed **Postgres only** → single-user lookups already work (served from the
-  PG fallback). **This is enough for a live demo** — the frontend's hero
+  PG fallback). **This is enough for a live demo**, the frontend's hero
   lookup (user `12345`) will return real features.
 - Sync **Redis** afterwards → the `/features/batch` endpoint works and single
   lookups are served from Redis (lower latency, `source: "redis"`).
@@ -31,13 +31,13 @@ resources from `render.yaml`:
 ## Prerequisites
 
 - A Render account (sign up with GitHub).
-- The repo pushed to GitHub — already at `ne-he/Feature_shopz`.
+- The repo pushed to GitHub: already at `ne-he/Feature_shopz`.
 - The dataset present locally at `data/raw/ecommerce_synthetic_dataset.csv`
   (used only for seeding from your laptop; it is never shipped in the image).
 
 ---
 
-## Step 1 — Push the deploy files
+## Step 1: Push the deploy files
 
 These files drive the deploy and must be on the branch Render builds:
 
@@ -51,7 +51,7 @@ git commit -m "feat(deploy): containerize API + Render blueprint for public depl
 git push origin master
 ```
 
-## Step 2 — Create the Blueprint on Render
+## Step 2: Create the Blueprint on Render
 
 1. Render Dashboard → **New +** → **Blueprint**.
 2. Connect the `ne-he/Feature_shopz` repo. Render detects `render.yaml` and
@@ -62,13 +62,13 @@ git push origin master
    - `https://feature-store-api.onrender.com/health` → `200` `{"status":"healthy"}`
      (both stores reachable, just empty).
    - `/` loads the frontend; `/docs` shows Swagger.
-   - A lookup like `/features/online/12345` returns **404** for now — no data
+   - A lookup like `/features/online/12345` returns **404** for now, no data
      yet. That's expected; seed next.
 
 > Your exact URL is shown in the service header; it may differ from the example
 > above if the name was taken.
 
-## Step 3 — Seed the offline store (from your laptop)
+## Step 3: Seed the offline store (from your laptop)
 
 The dataset lives on your machine, so compute features locally and write them
 straight into the **cloud Postgres**.
@@ -90,10 +90,10 @@ Remove-Item Env:\DATABASE_URL
 > The migration (`alembic upgrade head`) already created the tables on first
 > boot, so this just fills them.
 
-## Step 4 — Sync Redis (optional, enables `/batch` + the fast path)
+## Step 4: Sync Redis (optional, enables `/batch` + the fast path)
 
 Run this **inside Render** so it uses the internal Redis (no TLS/IP setup). The
-dataset is not needed — it reads the already-seeded Postgres.
+dataset is not needed, it reads the already-seeded Postgres.
 
 1. Render → `feature-store-api` → **Shell** tab.
 2. Run:

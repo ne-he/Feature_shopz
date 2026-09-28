@@ -56,7 +56,7 @@ def run_ingestion() -> None:
 
 def main() -> None:
     """Entry point: initialise the database and run the ingestion pipeline."""
-    logger.info("seed_data.py — starting")
+    logger.info("seed_data.py: starting")
     init_database()
     run_ingestion()
     logger.success("Seed complete ✓")
