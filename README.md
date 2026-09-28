@@ -4,7 +4,7 @@
 > Ingests transaction data, computes 20+ user-level features in batch,
 > serves them via a low-latency REST API, and monitors freshness & drift.
 
-**Status:** 🚧 Milestone 1 complete — Foundation & Data Layer ✓
+**Status:** 🚧 Milestone 1 complete, Foundation & Data Layer ✓
 
 > **Full specification:** [`PRD.md`](PRD.md) · **Engineering conventions:** [`CLAUDE.md`](CLAUDE.md)
 
@@ -20,8 +20,8 @@ flowchart TB
     end
 
     subgraph Ingestion["⚙️ Ingestion Layer"]
-        LOAD[loader.py — CSV → DataFrame]
-        CLEAN[cleaner.py — clip, parse, coerce]
+        LOAD[loader.py: CSV → DataFrame]
+        CLEAN[cleaner.py: clip, parse, coerce]
     end
 
     subgraph Compute["🧮 Feature Computation (M2)"]
@@ -35,12 +35,12 @@ flowchart TB
     end
 
     subgraph Serving["🌐 Serving Layer (M3)"]
-        API[FastAPI — /features/online /batch]
+        API[FastAPI: /features/online /batch]
     end
 
     subgraph Monitoring["📊 Monitoring (M4)"]
         DASH[Streamlit Dashboard]
-        DRIFT[Evidently — Drift Detection]
+        DRIFT[Evidently: Drift Detection]
     end
 
     CSV --> LOAD --> CLEAN --> PIPE --> RFM --> PG
@@ -70,7 +70,7 @@ flowchart TB
 
 - Python 3.11 or newer
 - Docker + Docker Compose (for PostgreSQL + Redis)
-- `make` (optional — wraps all common commands)
+- `make` (optional: wraps all common commands)
 
 ## Quick Start
 
@@ -133,7 +133,7 @@ More details: [`data/README.md`](data/README.md).
 
 ```
 src/
-  config.py            Pydantic Settings — reads .env
+  config.py            Pydantic Settings, reads .env
   ingestion/           loader, schema, cleaner
   features/            RFM, behavior, engagement, temporal, discount, demographics (M2)
   storage/             SQLAlchemy models, offline (PG) + online (Redis) stores (M2-M3)
@@ -203,4 +203,4 @@ alembic revision --autogenerate -m "describe change"
 
 ## License
 
-MIT — see `pyproject.toml`.
+MIT: see `pyproject.toml`.

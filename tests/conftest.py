@@ -23,7 +23,7 @@ def sample_csv_path() -> Path:
 def sample_df() -> pd.DataFrame:
     """Return the 10-row sample DataFrame loaded from the fixture CSV.
 
-    Uses the raw (uncleaned) CSV — individual tests decide whether to
+    Uses the raw (uncleaned) CSV, individual tests decide whether to
     call ``clean_transactions`` on top of this.
     """
     return pd.read_csv(SAMPLE_CSV)

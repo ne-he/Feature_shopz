@@ -42,7 +42,7 @@ def load_transactions(csv_path: Path) -> pd.DataFrame:
     """Load the raw transaction CSV into a DataFrame.
 
     Validates that all 21 expected columns are present. No type coercions are
-    applied here — that is cleaner.py's job.
+    applied here: that is cleaner.py's job.
 
     Args:
         csv_path: Absolute or relative path to the source CSV file.

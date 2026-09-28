@@ -17,7 +17,7 @@ REVIEW_SCORE_MAX: float = 5.0
 def clean_transactions(df: pd.DataFrame) -> pd.DataFrame:
     """Apply all cleaning transformations to the raw transactions DataFrame.
 
-    The input DataFrame is never modified in place — a copy is returned.
+    The input DataFrame is never modified in place, a copy is returned.
 
     Args:
         df: Raw DataFrame as returned by ``loader.load_transactions()``.
