@@ -50,7 +50,7 @@ def run_benchmark(csv_path: Path) -> bool:
     Returns:
         True if pipeline finished within SLA, False otherwise.
     """
-    logger.info("Benchmark starting — CSV: {}", csv_path)
+    logger.info("Benchmark starting, CSV: {}", csv_path)
     t0 = time.perf_counter()
     result = run_feature_pipeline(csv_path)
     elapsed = time.perf_counter() - t0
@@ -69,10 +69,10 @@ def run_benchmark(csv_path: Path) -> bool:
 
     within_sla = elapsed <= _SLA_SECONDS
     if within_sla:
-        logger.info("SLA OK — {:.1f}s < {:.0f}s limit", elapsed, _SLA_SECONDS)
+        logger.info("SLA OK: {:.1f}s < {:.0f}s limit", elapsed, _SLA_SECONDS)
     else:
         logger.warning(
-            "SLA BREACH — {:.1f}s > {:.0f}s limit for {:,} users",
+            "SLA BREACH: {:.1f}s > {:.0f}s limit for {:,} users",
             elapsed,
             _SLA_SECONDS,
             n_users,

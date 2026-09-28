@@ -1,1 +1,1 @@
-"""Feature Store MVP — top-level source package."""
+"""Feature Store MVP: top-level source package."""

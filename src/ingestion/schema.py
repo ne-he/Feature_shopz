@@ -17,7 +17,7 @@ class RawTransactionRow(BaseModel):
     """Single row of the raw e-commerce transaction dataset (all 21 columns).
 
     Reflects the schema documented in PRD § 6. ReviewScore may arrive outside
-    [1, 5] — that is an expected quirk handled by cleaner.py, not this model.
+    [1, 5]: that is an expected quirk handled by cleaner.py, not this model.
     """
 
     UserID: int

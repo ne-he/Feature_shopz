@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, text
 
 testcontainers = pytest.importorskip(
     "testcontainers",
-    reason="testcontainers not installed — skipping integration tests",
+    reason="testcontainers not installed, skipping integration tests",
 )
 from testcontainers.postgres import PostgresContainer  # noqa: E402 (after importorskip)
 
