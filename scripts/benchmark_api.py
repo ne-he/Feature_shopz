@@ -6,7 +6,7 @@ single-user < 100ms, batch-of-100 < 500ms.
 
 Two modes:
     --in-process  (default) drives the ASGI app directly with in-memory
-                  SQLite + fakeredis stores — no server or Docker required.
+                  SQLite + fakeredis stores, no server or Docker required.
                   This measures the pure serving path (no network hop), so
                   it is a lower bound on real latency.
     --base-url    benchmarks a live server backed by real PostgreSQL + Redis.

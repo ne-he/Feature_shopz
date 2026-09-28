@@ -4,7 +4,7 @@
 > Ingests transaction data, computes 20+ user-level features in batch,
 > serves them via a low-latency REST API, and monitors freshness & drift.
 
-**Status:** ✅ All milestones complete (M1–M4) — ingestion → features → serving API → monitoring.
+**Status:** ✅ All milestones complete (M1–M4), ingestion → features → serving API → monitoring.
 
 ---
 
@@ -17,8 +17,8 @@ flowchart TB
     end
 
     subgraph Ingestion["⚙️ Ingestion Layer"]
-        LOAD[loader.py — CSV → DataFrame]
-        CLEAN[cleaner.py — clip, parse, coerce]
+        LOAD[loader.py: CSV → DataFrame]
+        CLEAN[cleaner.py: clip, parse, coerce]
     end
 
     subgraph Compute["🧮 Feature Computation (M2)"]
@@ -32,12 +32,12 @@ flowchart TB
     end
 
     subgraph Serving["🌐 Serving Layer (M3)"]
-        API[FastAPI — /features/online /batch]
+        API[FastAPI: /features/online /batch]
     end
 
     subgraph Monitoring["📊 Monitoring (M4)"]
         DASH[Streamlit Dashboard]
-        DRIFT[Evidently — Drift Detection]
+        DRIFT[Evidently: Drift Detection]
     end
 
     CSV --> LOAD --> CLEAN --> PIPE --> RFM --> PG
@@ -67,7 +67,7 @@ flowchart TB
 
 - Python 3.11 or newer
 - Docker + Docker Compose (for PostgreSQL + Redis)
-- `make` (optional — wraps all common commands)
+- `make` (optional: wraps all common commands)
 
 ## Quick Start
 
@@ -111,10 +111,10 @@ Both services define healthchecks, use named Docker volumes
 > On Windows, invoke the project venv directly: `.\.venv\Scripts\python.exe -m <cmd>`.
 
 ```bash
-# Serving API (M3) — Swagger UI at http://localhost:8000/docs
+# Serving API (M3): Swagger UI at http://localhost:8000/docs
 uvicorn src.api.main:app --reload
 
-# Monitoring dashboard (M4) — opens at http://localhost:8501
+# Monitoring dashboard (M4): opens at http://localhost:8501
 streamlit run src/dashboard/app.py
 
 # One-off feature refresh (compute → offline store → sync to Redis)
@@ -161,14 +161,14 @@ More details: [`data/README.md`](data/README.md).
 
 ```
 src/
-  config.py            Pydantic Settings — reads .env
+  config.py            Pydantic Settings, reads .env
   ingestion/           loader, schema, cleaner
   features/            RFM, behavior, engagement, temporal, discount, demographics (M2)
   storage/             SQLAlchemy models, offline (PG) + online (Redis) stores (M2-M3)
   api/                 FastAPI app + routes (M3)
   orchestration/       APScheduler daily refresh job (M4)
   monitoring/          Freshness, Evidently drift, store metrics (M4)
-  dashboard/           Streamlit app — 4 pages (M4)
+  dashboard/           Streamlit app, 4 pages (M4)
 
 tests/
   conftest.py          Shared fixtures
@@ -234,4 +234,4 @@ alembic revision --autogenerate -m "describe change"
 
 ## License
 
-MIT — see `pyproject.toml`.
+MIT: see `pyproject.toml`.

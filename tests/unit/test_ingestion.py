@@ -113,7 +113,7 @@ class TestCleanTransactions:
 
 
 # ---------------------------------------------------------------------------
-# schema.py — Pydantic model
+# schema.py: Pydantic model
 # ---------------------------------------------------------------------------
 
 _VALID_ROW_DATA: dict[str, object] = {

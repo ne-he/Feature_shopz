@@ -18,14 +18,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # PostgreSQL — offline feature store
+    # PostgreSQL: offline feature store
     postgres_host: str = Field(default="localhost")
     postgres_port: int = Field(default=5432)
     postgres_user: str = Field(default="feature_store")
     postgres_password: str = Field(default="changeme")
     postgres_db: str = Field(default="feature_store")
 
-    # Redis — online feature store
+    # Redis: online feature store
     redis_host: str = Field(default="localhost")
     redis_port: int = Field(default=6379)
 
