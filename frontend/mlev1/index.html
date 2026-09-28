@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Feature Store MVP — One definition. Two stores. Zero skew.</title>
+<title>Feature Store MVP · One definition. Two stores. Zero skew.</title>
 <meta name="description" content="A from-scratch feature store for e-commerce ML. 23 user-level features computed once, served fast and consistently to model training (PostgreSQL) and live inference (Redis) via a FastAPI REST API." />
 
 <!-- Fonts: editorial serif display + grotesque body + engineering mono -->
@@ -144,7 +144,7 @@
 
 <!-- ============ HERO ============ -->
 <section id="hero" class="relative pt-28 md:pt-36 pb-16 md:pb-20 overflow-hidden">
-  <!-- (hero background video intentionally omitted — the footage now lives, framed and monochrome, inside Fig. 00 on the right) -->
+  <!-- (hero background video intentionally omitted: the footage now lives, framed and monochrome, inside Fig. 00 on the right) -->
 
   <div class="mx-auto max-w-content px-5 md:px-8">
     <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-14 items-center">
@@ -162,7 +162,7 @@
         </h1>
 
         <p class="reveal mt-7 max-w-xl text-[17px] md:text-lg leading-relaxed text-muted" data-delay="2">
-          Feature Store MVP computes <span class="text-ink font-medium">23 user-level features</span> once, then serves them fast and consistently to model training and live inference — ending the train/serve skew that quietly degrades production models.
+          Feature Store MVP computes <span class="text-ink font-medium">23 user-level features</span> once, then serves them fast and consistently to model training and live inference, ending the train/serve skew that quietly degrades production models.
         </p>
 
         <div class="reveal mt-9 flex flex-wrap items-center gap-x-7 gap-y-4" data-delay="3">
@@ -193,7 +193,7 @@
             <dt class="label text-faint mt-1">Users</dt>
           </div>
         </dl>
-        <p class="reveal label text-faint mt-3 normal-case tracking-normal" data-delay="4" style="font-size:11px;">* Design target — not a measured benchmark.</p>
+        <p class="reveal label text-faint mt-3 normal-case tracking-normal" data-delay="4" style="font-size:11px;">* Design target: not a measured benchmark.</p>
       </div>
 
       <!-- Right: live-lookup figure -->
@@ -211,7 +211,7 @@
                 <span class="font-mono text-[10px] tracking-[0.16em]" style="color:#E6E1D5;">FEATURE STREAM</span>
               </div>
             </div>
-            <!-- request header — editable, live -->
+            <!-- request header: editable, live -->
             <form id="lookup-form" class="flex items-center justify-between gap-3 px-5 py-3 border-t border-b border-line bg-paper2/60">
               <div class="flex items-center gap-2 min-w-0">
                 <span class="label text-accent shrink-0">GET</span>
@@ -223,7 +223,7 @@
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <span id="status-dot" class="h-1.5 w-1.5 rounded-full bg-faint"></span>
-                <span id="status-text" class="font-mono text-[11px] text-muted">— · <span id="lat">—</span>ms</span>
+                <span id="status-text" class="font-mono text-[11px] text-muted">- · <span id="lat">-</span>ms</span>
               </div>
             </form>
             <!-- feature rows -->
@@ -232,12 +232,12 @@
             </div>
             <!-- footer -->
             <div class="flex items-center justify-between px-5 py-3 border-t border-line bg-paper2/40 font-mono text-[11px] text-faint">
-              <span>source: <span id="lk-source" class="text-slate">—</span></span>
-              <span>feature_version: <span id="lk-version">—</span></span>
-              <span id="lk-computed" class="hidden sm:inline">—</span>
+              <span>source: <span id="lk-source" class="text-slate">-</span></span>
+              <span>feature_version: <span id="lk-version">-</span></span>
+              <span id="lk-computed" class="hidden sm:inline">-</span>
             </div>
           </div>
-          <figcaption class="label text-faint mt-3 ml-1">Fig. 00 — A served feature vector</figcaption>
+          <figcaption class="label text-faint mt-3 ml-1">Fig. 00: A served feature vector</figcaption>
         </figure>
       </div>
     </div>
@@ -250,7 +250,7 @@
   <div class="mx-auto max-w-content px-5 md:px-8">
     <div class="reveal flex flex-col md:flex-row md:items-end justify-between gap-6">
       <div class="max-w-2xl">
-        <p class="label text-accent">§ 01 — Feature Catalog</p>
+        <p class="label text-accent">§ 01 · Feature Catalog</p>
         <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">23 features.<br class="hidden sm:block" /> One definition each.</h2>
         <p class="mt-5 max-w-lg text-muted leading-relaxed">Every feature is computed once in the pipeline and served identically to training and inference. Filter the datasheet by category.</p>
       </div>
@@ -299,9 +299,9 @@
 <section id="architecture" class="relative py-20 md:py-28 border-t border-line2 bg-paper2/40">
   <div class="mx-auto max-w-content px-5 md:px-8">
     <div class="reveal max-w-2xl">
-      <p class="label text-accent">§ 02 — Architecture</p>
+      <p class="label text-accent">§ 02 · Architecture</p>
       <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">One pipeline,<br class="hidden sm:block" /> two synchronized stores.</h2>
-      <p class="mt-5 max-w-xl text-muted leading-relaxed">Raw transactions flow through a single batch pipeline that writes both stores from the same definition — so the offline (training) and online (serving) paths never diverge.</p>
+      <p class="mt-5 max-w-xl text-muted leading-relaxed">Raw transactions flow through a single batch pipeline that writes both stores from the same definition, so the offline (training) and online (serving) paths never diverge.</p>
     </div>
 
     <!-- figure -->
@@ -366,7 +366,7 @@
           </div>
         </div>
       </div>
-      <figcaption class="label text-faint mt-8 pt-5 border-t border-line">Fig. 01 — System topology · raw data → one pipeline → dual store → API → models</figcaption>
+      <figcaption class="label text-faint mt-8 pt-5 border-t border-line">Fig. 01: System topology · raw data → one pipeline → dual store → API → models</figcaption>
     </figure>
 
     <!-- legend columns -->
@@ -381,7 +381,7 @@
       </div>
       <div class="reveal bg-card p-7" data-delay="3">
         <div class="flex items-center gap-2.5"><span class="h-2 w-2 rounded-full bg-ink2"></span><span class="label text-muted">Kept in sync</span></div>
-        <p class="mt-3 text-[15px] text-ink2 leading-relaxed">One pipeline writes both stores from a single definition — training and serving can't drift apart.</p>
+        <p class="mt-3 text-[15px] text-ink2 leading-relaxed">One pipeline writes both stores from a single definition, training and serving can't drift apart.</p>
       </div>
     </div>
   </div>
@@ -391,13 +391,13 @@
 <section id="api" class="relative py-20 md:py-28 border-t border-line2">
   <div class="mx-auto max-w-content px-5 md:px-8">
     <div class="reveal max-w-2xl">
-      <p class="label text-accent">§ 03 — API</p>
+      <p class="label text-accent">§ 03 · API</p>
       <h2 class="serif mt-4 text-5xl md:text-6xl text-ink">A small, predictable surface.</h2>
-      <p class="mt-5 max-w-xl text-muted leading-relaxed">Five endpoints cover the read lifecycle — health, online and offline reads, batch lookups, and metadata. <span class="text-ink">Click any row to run it live</span> against the response panel.</p>
+      <p class="mt-5 max-w-xl text-muted leading-relaxed">Five endpoints cover the read lifecycle: health, online and offline reads, batch lookups, and metadata. <span class="text-ink">Click any row to run it live</span> against the response panel.</p>
     </div>
 
     <div class="mt-12 grid lg:grid-cols-[0.92fr_1.08fr] gap-6 lg:gap-8 items-start">
-      <!-- endpoints (clickable — run live) -->
+      <!-- endpoints (clickable: run live) -->
       <div id="endpoint-list" class="reveal border border-line2 rounded-lg overflow-hidden bg-card divide-y divide-line">
         <button type="button" class="endpoint w-full text-left" data-try="health"><span class="meth meth-get">GET</span><code>/health</code><span class="ep-note">service + deps</span></button>
         <button type="button" class="endpoint endpoint-hi w-full text-left" data-try="online"><span class="meth meth-get">GET</span><code>/features/online/<span class="text-accent">{user_id}</span></code><span class="ep-note text-accent">redis → pg fallback</span></button>
@@ -445,7 +445,7 @@
           <span class="serif text-2xl text-ink">Feature Store</span>
           <span class="label text-faint">MVP</span>
         </div>
-        <p class="mt-3 max-w-md text-sm text-muted leading-relaxed">A from-scratch feature store for e-commerce ML — the infrastructure layer between raw data and models.</p>
+        <p class="mt-3 max-w-md text-sm text-muted leading-relaxed">A from-scratch feature store for e-commerce ML, the infrastructure layer between raw data and models.</p>
       </div>
       <a href="https://github.com" target="_blank" rel="noopener" class="label text-ink hover:text-accent transition-colors">View source ↗</a>
     </div>
@@ -682,7 +682,7 @@
 })();
 </script>
 
-<!-- ============ LIVE DATA LAYER — wires the page to the FastAPI backend ============ -->
+<!-- ============ LIVE DATA LAYER: wires the page to the FastAPI backend ============ -->
 <script>
 (function () {
   'use strict';
@@ -691,7 +691,7 @@
   // to localhost:8000 when the file is opened directly. CORS covers the latter.
   var API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://localhost:8000';
   var ORIGIN = API_BASE || location.origin;
-  var OFFLINE = { error: 'API offline — start it with: uvicorn src.api.main:app' };
+  var OFFLINE = { error: 'API offline, start it with: uvicorn src.api.main:app' };
 
   function $(id) { return document.getElementById(id); }
 
@@ -763,7 +763,7 @@
     apiFetch('/features/metadata').then(function (r) {
       if (!(r.ok && r.data && r.data.features && r.data.features.length)) return;
       featRows.innerHTML = r.data.features.map(function (f, i) {
-        var cat = name2cat[f.name] || '—';
+        var cat = name2cat[f.name] || '-';
         return '<div class="frow" data-cat="' + esc(cat) + '">' +
           '<span class="fnum">' + String(i + 1).padStart(2, '0') + '</span>' +
           '<span class="fname">' + esc(f.name) + '</span>' +
@@ -804,12 +804,12 @@
   }
   function setStatus(color, label, ms) {
     if (sDot) sDot.className = 'h-1.5 w-1.5 rounded-full bg-' + color;
-    if (sText) sText.innerHTML = esc(label) + ' · <span id="lat">' + (ms != null ? ms : '—') + '</span>ms';
+    if (sText) sText.innerHTML = esc(label) + ' · <span id="lat">' + (ms != null ? ms : '-') + '</span>ms';
   }
   function setMeta(meta) {
-    if (lkSource) lkSource.textContent = (meta && meta.source) || '—';
-    if (lkVersion) lkVersion.textContent = (meta && meta.feature_version) || '—';
-    if (lkComputed) lkComputed.textContent = (meta && meta.computed_at) ? ('computed ' + meta.computed_at) : '—';
+    if (lkSource) lkSource.textContent = (meta && meta.source) || '-';
+    if (lkVersion) lkVersion.textContent = (meta && meta.feature_version) || '-';
+    if (lkComputed) lkComputed.textContent = (meta && meta.computed_at) ? ('computed ' + meta.computed_at) : '-';
   }
 
   function runLookup(uid) {

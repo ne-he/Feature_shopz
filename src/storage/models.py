@@ -25,7 +25,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """Shared declarative base — all ORM models inherit from this."""
+    """Shared declarative base: all ORM models inherit from this."""
 
 
 class UserFeatures(Base):

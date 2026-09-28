@@ -2,7 +2,7 @@
 
 Builds a BackgroundScheduler with the ``run_refresh_job`` callable registered
 on a FEATURE_REFRESH_CADENCE_HOURS interval. APScheduler is used instead of
-Prefect because the workload is a single daily batch — see the CLAUDE.md
+Prefect because the workload is a single daily batch: see the CLAUDE.md
 Decision Log (2026-06-01). The job is also triggerable on demand by calling
 ``run_refresh_job`` directly.
 """

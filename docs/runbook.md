@@ -1,4 +1,4 @@
-# Runbook — Feature Store MVP
+# Runbook: Feature Store MVP
 
 Operational playbook for running and troubleshooting the feature store
 locally. Covers the daily refresh, the serving API, the monitoring dashboard,
@@ -70,9 +70,9 @@ streamlit run src/dashboard/app.py   # http://localhost:8501
 ## 4. Troubleshooting
 
 ### `/health` returns 503
-- **`postgres: unavailable`** — is the container up? `docker compose ps`.
+- **`postgres: unavailable`**: is the container up? `docker compose ps`.
   Check `.env` credentials match `docker-compose.yml`. Try `alembic upgrade head`.
-- **`redis: unavailable`** — `docker compose restart redis`; confirm port 6379.
+- **`redis: unavailable`**: `docker compose restart redis`; confirm port 6379.
 
 ### API returns 404 for a known user
 Features have not been synced to Redis (or expired past the 25h TTL). Re-run
@@ -99,5 +99,5 @@ PostgreSQL data persists in the `postgres_data` Docker volume. Back up / restore
 docker compose exec postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup.sql
 docker compose exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB" < backup.sql
 ```
-Redis is a cache and is rebuilt from Postgres on the next refresh — no backup
+Redis is a cache and is rebuilt from Postgres on the next refresh, no backup
 needed.
