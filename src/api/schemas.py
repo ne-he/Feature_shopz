@@ -94,7 +94,7 @@ class FeatureCatalogEntry(BaseModel):
 
 
 class FeatureMetadataResponse(BaseModel):
-    """Response for GET /features/metadata — the feature catalog."""
+    """Response for GET /features/metadata: the feature catalog."""
 
     features: list[FeatureCatalogEntry]
     total_features: int

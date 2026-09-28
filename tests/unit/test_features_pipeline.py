@@ -100,7 +100,7 @@ class TestRunFeaturePipeline:
     def test_run_feature_pipeline_user_id_is_unique(
         self, pipeline_output: pd.DataFrame
     ) -> None:
-        """user_id is a valid primary key — no duplicates."""
+        """user_id is a valid primary key, no duplicates."""
         assert pipeline_output["user_id"].is_unique
 
     def test_run_feature_pipeline_feature_version_is_v1(

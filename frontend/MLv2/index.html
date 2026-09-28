@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Feature Store MVP — One definition. Two stores. Zero skew.</title>
+<title>Feature Store MVP · One definition. Two stores. Zero skew.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   FEATURE STORE MVP — mission-control HUD over a data stream
+   FEATURE STORE MVP, mission-control HUD over a data stream
    Palette: near-black + ONE amber signal accent + off-white
    ============================================================ */
 :root{
@@ -24,7 +24,7 @@
   --panel:rgba(13,12,11,.55);
   --panel-2:rgba(20,18,16,.66);
   --redis:#FF6A1A;
-  --pg:#7fb3ff;           /* postgres tag — used ONLY as a tiny data-source token */
+  --pg:#7fb3ff;           /* postgres tag, used ONLY as a tiny data-source token */
   --glass-blur:14px;
 }
 *{box-sizing:border-box}
@@ -320,7 +320,7 @@ button,input{font-family:inherit;color:inherit}
       </div>
       <div class="tagline">One definition&nbsp; <span class="tick">·</span> &nbsp;<em>Two stores</em>&nbsp; <span class="tick">·</span> &nbsp;Zero skew</div>
     </div>
-    <div class="health offline" id="health" role="status" aria-live="polite" title="API liveness — polls GET /health">
+    <div class="health offline" id="health" role="status" aria-live="polite" title="API liveness · polls GET /health">
       <span class="health__dot"></span>
       <span class="health__label">API <b id="healthState">CHECKING</b></span>
       <span class="health__rtt" id="healthRtt"></span>
@@ -366,9 +366,9 @@ button,input{font-family:inherit;color:inherit}
         </div>
 
         <div class="meta-row" id="metaRow" hidden>
-          <div class="stat"><div class="stat__k">Latency</div><div class="stat__v"><span id="statMs">—</span><small>ms</small></div></div>
-          <div class="stat"><div class="stat__k">Source</div><div class="stat__v"><span id="statSrc">—</span></div></div>
-          <div class="stat"><div class="stat__k">Features</div><div class="stat__v"><span id="statN">—</span></div></div>
+          <div class="stat"><div class="stat__k">Latency</div><div class="stat__v"><span id="statMs">-</span><small>ms</small></div></div>
+          <div class="stat"><div class="stat__k">Source</div><div class="stat__v"><span id="statSrc">-</span></div></div>
+          <div class="stat"><div class="stat__k">Features</div><div class="stat__v"><span id="statN">-</span></div></div>
           <span class="badge-fallback" id="fbBadge" hidden>sample · API offline</span>
         </div>
 
@@ -419,7 +419,7 @@ button,input{font-family:inherit;color:inherit}
     </div>
     <div class="modal__body">
       <p>A feature store computes user features <strong>once</strong> and serves them two ways: in bulk to <span class="hot">TRAIN</span> models (offline, PostgreSQL) and one-at-a-time to make <span class="hot">real-time predictions</span> (online, Redis).</p>
-      <p>Same definition on both sides — so a model never sees different numbers in training vs production. That bug is called <strong>train/serve skew</strong>, and this kills it.</p>
+      <p>Same definition on both sides, so a model never sees different numbers in training vs production. That bug is called <strong>train/serve skew</strong>, and this kills it.</p>
     </div>
   </div>
 
@@ -464,7 +464,7 @@ button,input{font-family:inherit;color:inherit}
         <div class="conn"><span class="pulse" style="animation-delay:1.2s"></span></div>
         <div class="node"><span class="ic">consume</span><span class="nm">ML&nbsp;Models</span><span class="sub">predict</span></div>
       </div>
-      <p class="topo-note">Connectors pulse with the stream — one definition fans out to both stores, then serves over REST.</p>
+      <p class="topo-note">Connectors pulse with the stream, one definition fans out to both stores, then serves over REST.</p>
     </div>
   </div>
 
@@ -476,11 +476,11 @@ button,input{font-family:inherit;color:inherit}
     </div>
     <div class="modal__body">
       <div class="why">
-        <div class="why__card"><div class="n">01</div><div class="h">Compute once, reuse everywhere</div><div class="p">Features are computed a single time and reused across every model and team — no duplicated feature engineering.</div></div>
+        <div class="why__card"><div class="n">01</div><div class="h">Compute once, reuse everywhere</div><div class="p">Features are computed a single time and reused across every model and team, no duplicated feature engineering.</div></div>
         <div class="why__card"><div class="n">02</div><div class="h">Kills train/serve skew</div><div class="p">Eliminates the silent bug that ships wrong predictions and costs hours of debugging.</div></div>
-        <div class="why__card"><div class="n">03</div><div class="h">Millisecond serving</div><div class="p">Redis serves precomputed features in milliseconds — no expensive recompute per request.</div></div>
+        <div class="why__card"><div class="n">03</div><div class="h">Millisecond serving</div><div class="p">Redis serves precomputed features in milliseconds, no expensive recompute per request.</div></div>
         <div class="why__card"><div class="n">04</div><div class="h">Predictable batch cost</div><div class="p">Daily batch precompute means predictable, low compute cost vs on-demand recomputation.</div></div>
-        <div class="why__card" style="grid-column:1/-1"><div class="n">05</div><div class="h">One source of truth</div><div class="p">Faster iteration — and in ML, the real cost is engineer time.</div></div>
+        <div class="why__card" style="grid-column:1/-1"><div class="n">05</div><div class="h">One source of truth</div><div class="p">Faster iteration, and in ML, the real cost is engineer time.</div></div>
       </div>
     </div>
   </div>
@@ -494,14 +494,14 @@ button,input{font-family:inherit;color:inherit}
     <div class="modal__body">
       <p>Five REST endpoints expose the stores. The page below calls them live, with a graceful sample fallback when the API is offline.</p>
       <div class="endpoints">
-        <div class="ep"><span class="m">GET</span><span class="p"><b>/health</b> — liveness, returns store status</span></div>
-        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/online/{user_id}</b> — Redis-first, PostgreSQL fallback (real-time)</span></div>
-        <div class="ep"><span class="m post">POST</span><span class="p"><b>/features/batch</b> — up to 100 users from the online store</span></div>
-        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/offline/{user_id}</b> — PostgreSQL only (training lookups)</span></div>
-        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/metadata</b> — the 23-feature catalog from the registry</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/health</b>: liveness, returns store status</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/online/{user_id}</b>: Redis-first, PostgreSQL fallback (real-time)</span></div>
+        <div class="ep"><span class="m post">POST</span><span class="p"><b>/features/batch</b>: up to 100 users from the online store</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/offline/{user_id}</b>: PostgreSQL only (training lookups)</span></div>
+        <div class="ep"><span class="m">GET</span><span class="p"><b>/features/metadata</b>: the 23-feature catalog from the registry</span></div>
       </div>
       <a class="repo-link" href="https://github.com/ne-he/Feature_shopz" target="_blank" rel="noopener">→ &nbsp;github.com/ne-he/<b>Feature_shopz</b> &nbsp;↗</a>
-      <p style="font-size:11px;color:var(--faint);margin-top:16px">&lt;100ms p99 — design target, measured in-process, not a production benchmark.</p>
+      <p style="font-size:11px;color:var(--faint);margin-top:16px">&lt;100ms p99: design target, measured in-process, not a production benchmark.</p>
     </div>
   </div>
 
@@ -509,7 +509,7 @@ button,input{font-family:inherit;color:inherit}
 
 <script>
 /* ============================================================
-   DATA — the 23-feature registry (mirrors /features/metadata)
+   DATA: the 23-feature registry (mirrors /features/metadata)
    ============================================================ */
 const CATEGORIES = ["All","RFM","Behavioral","Engagement","Temporal","Discount","Demographics"];
 const FEATURES = [
@@ -564,7 +564,7 @@ function fmt(v,type){
 }
 
 /* ============================================================
-   FEATURE CATALOG — tabs + filterable datasheet
+   FEATURE CATALOG: tabs + filterable datasheet
    ============================================================ */
 let activeCat = "All";
 function renderTabs(){
@@ -593,7 +593,7 @@ function renderCatalog(){
 }
 
 /* ============================================================
-   LIVE LOOKUP — fetch online features, stream rows in
+   LIVE LOOKUP: fetch online features, stream rows in
    ============================================================ */
 function sampleResponse(uid){
   const features = {};
@@ -625,7 +625,7 @@ async function fetchOnline(uid){
     const latency = hdr != null ? Math.round(parseFloat(hdr)) : (data.latency_ms != null ? data.latency_ms : rtt);
     return { user_id:uid, source, latency_ms:latency, features, _fallback:false };
   }catch(err){
-    // network/timeout/5xx only — graceful sample so the page still demos offline
+    // network/timeout/5xx only: graceful sample so the page still demos offline
     await new Promise(r=>setTimeout(r, 320)); // tiny beat so it still feels like a request
     return sampleResponse(uid);
   }
@@ -636,7 +636,7 @@ function pairFeatures(features){
   const ordered = [];
   const seen = new Set();
   FEATURES.forEach(f=>{ if(f.name in features){ ordered.push({...f, val:features[f.name]}); seen.add(f.name); }});
-  Object.keys(features).forEach(k=>{ if(!seen.has(k)) ordered.push({name:k,cat:"—",type:typeof features[k]==="number"?"float":(typeof features[k]==="boolean"?"bool":"str"),desc:"",val:features[k]}); });
+  Object.keys(features).forEach(k=>{ if(!seen.has(k)) ordered.push({name:k,cat:"-",type:typeof features[k]==="number"?"float":(typeof features[k]==="boolean"?"bool":"str"),desc:"",val:features[k]}); });
   return ordered;
 }
 
@@ -709,7 +709,7 @@ $("#lookupForm").addEventListener("submit", e=>{
 });
 
 /* ============================================================
-   HEALTH BADGE — poll GET /health
+   HEALTH BADGE: poll GET /health
    ============================================================ */
 const healthEl = $("#health"), healthState = $("#healthState"), healthRtt = $("#healthRtt");
 /* Consecutive failed polls. One miss is not an outage: a container waking
@@ -749,7 +749,7 @@ async function pollHealth(){
 }
 
 /* ============================================================
-   MODALS — accessible: focus trap-ish, ESC, click-out, aria
+   MODALS: accessible: focus trap-ish, ESC, click-out, aria
    ============================================================ */
 const scrim = $("#scrim");
 let lastFocus = null;
@@ -782,7 +782,7 @@ scrim.addEventListener("keydown", e=>{
 });
 
 /* ============================================================
-   BACKGROUND VIDEO — reveal when it can paint; honor reduced motion
+   BACKGROUND VIDEO: reveal when it can paint; honor reduced motion
    ============================================================ */
 const bgVideo = $("#bgVideo");
 if(reduceMotion){

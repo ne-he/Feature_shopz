@@ -1,4 +1,4 @@
-# Makefile — common developer commands for feature-store-mvp.
+# Makefile: common developer commands for feature-store-mvp.
 # Usage: `make <target>`. Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
